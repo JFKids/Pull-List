@@ -379,11 +379,11 @@ tr:has(.flag.bad) td,tr:has(.flag.warn) td{background:transparent}
   html.hosted header{padding-top:calc(env(safe-area-inset-top,0px) * 1.8)!important}
   html.hosted main.wrap{padding-top:calc(28px + env(safe-area-inset-top,0px) * 1.8)}
 }
-/* iPad saved to the home screen: the fade under the clock is taller than the status bar itself (about 60pt),
+/* iPad saved to the home screen: the fade under the clock ends about 45pt down,
    so leave a plain white band that tall at the top of the side list, and the same in cream above the page. */
 @media (min-width:900px){
-  html.hosted.standalone header{padding-top:max(64px, calc(env(safe-area-inset-top,0px) + 40px))!important}
-  html.hosted.standalone main.wrap{padding-top:max(92px, calc(env(safe-area-inset-top,0px) + 68px))}
+  html.hosted.standalone header{padding-top:max(34px, calc(env(safe-area-inset-top,0px) + 12px))!important}
+  html.hosted.standalone main.wrap{padding-top:max(62px, calc(env(safe-area-inset-top,0px) + 40px))}
 }
 
 </style>
