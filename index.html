@@ -372,6 +372,13 @@ tr:has(.flag.bad) td,tr:has(.flag.warn) td{background:transparent}
   .topbar .brand img{height:32px;width:auto}
   header .wrap{grid-template-areas:"h r" "w r"}
 }
+/* ---------- pass 6: iPad and other tablets ----------
+   iPadOS fades whatever sits right under the clock. On wide screens the side list and the page both start
+   below that band (inset x 1.8), so only plain white or cream sits there. On a laptop the inset is 0, so nothing moves. */
+@media (min-width:900px){
+  html.hosted header{padding-top:calc(env(safe-area-inset-top,0px) * 1.8)!important}
+  html.hosted main.wrap{padding-top:calc(28px + env(safe-area-inset-top,0px) * 1.8)}
+}
 
 </style>
 
