@@ -2855,6 +2855,8 @@ details#how{display:none!important}
 .tipbtn{margin-left:10px;vertical-align:middle;width:30px;height:30px;border-radius:50%;border:2px solid var(--rule);background:var(--surface);color:var(--ink);font:800 16px/1 var(--display);cursor:pointer}
 .tipbtn[aria-expanded="true"]{background:var(--ink);color:#fff}
 .tip{background:var(--surface);border:2px solid var(--rule);border-left-width:2px;padding:10px 14px;margin:4px 0 10px;max-width:68ch;font-size:15px}
+/* R3: Order rows stay white; the status tag carries the color (Pull and Closet map keep their tinted rows) */
+#view[data-tab="order"] tr:has(.flag.bad),#view[data-tab="order"] tr:has(.flag.warn){background:var(--surface)}
 /* neutral tag */
 .flag.plain{background:var(--surface);color:var(--ink)}
 /* banners and the Next box */
@@ -2911,6 +2913,8 @@ ul.months{margin:0;padding-left:18px}ul.months .btn{padding:3px 10px;font-size:1
   table.stack td{display:flex;gap:10px;padding:3px 0;border:0;align-items:baseline}
   table.stack td[data-label]::before{content:attr(data-label);flex:0 0 78px;font:700 11px var(--body);letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
   table.stack td:first-child::before{display:none}
+  /* R2: on checklist rows the label sits on the same line as its value, with room to breathe */
+  table.cklist td[data-label]::before{content:attr(data-label);display:inline-block;margin-right:8px;font:700 11px var(--body);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);vertical-align:1px}
   table.stack td:first-child{font-size:17px}
   .jump{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0 4px;position:sticky;top:calc(56px + env(safe-area-inset-top,0px));z-index:6;background:var(--paper);padding:6px 0}
   .jump a{font:700 14px var(--body);color:var(--ink);text-decoration:none;border:2px solid var(--rule);background:var(--surface);padding:8px 12px}
@@ -3610,7 +3614,7 @@ function rClosets(){
   const q=(S.find||"").toLowerCase().trim();
   const all=Object.entries(S.inv.items||{}).map(([k,v])=>({k,...v})).filter(v=>!q||(v.label+" "+v.spot+" "+v.note+" "+v.closet).toLowerCase().includes(q));
   const by={};all.forEach(v=>{(by[v.closet||"Not in any closet"] ||= []).push(v)});
-  let h=`<h2>Closet map</h2><p class="sub">Everything the lessons use and where it lives. Built from the closet photos and updated every time someone taps “Found it in…” or “Can't find it.”</p>
+  let h=`<h2>Closet map</h2><p class="sub">Everything the lessons use and where it lives.</p>
   <div class="inline-form" style="margin-bottom:10px"><input type="text" id="find" placeholder="Search (ex: balloons, glue, cones)" value="${esc(S.find||"")}" style="width:min(100%,360px)" aria-label="Search the closets"></div>`;
   for(const c of [...CLOSETS,"Other","Not in any closet"]){const list=by[c];if(!list)continue;list.sort((a,b)=>a.label.localeCompare(b.label));
     h+=`<div class="closet">${esc(c)} <span class="count">${list.length} item${list.length>1?"s":""}</span></div><div class="tablewrap"><table><thead><tr><th>Item</th><th>Where</th><th>Status</th></tr></thead><tbody>${list.map(v=>`<tr><td><b>${esc(cap(v.label))}</b></td><td>${esc(v.spot||"")}${v.note?`<div class="small">${esc(v.note)}</div>`:""}</td><td>${v.status==="have"?'<span class="flag ok">Have</span>':v.status==="check"?'<span class="flag warn">Confirm</span>':v.status==="low"?'<span class="flag warn">Low</span>':'<span class="flag bad">'+(v.status==="out"?"Out":"Not in a closet")+'</span>'}</td></tr>`).join("")}</tbody></table></div>`;}
@@ -3627,7 +3631,7 @@ function rCount(){
     const val=S.prog.headcounts?.[r.key]??"";
     return `<tr><td><b>${esc(band(r))}</b> · ${esc(r.room)}</td><td>${esc(r.teachers.join(", "))}<div class="small">They wrote: “${esc(r.raw_counts.join(" / "))}”</div></td><td>${flag}</td>
       <td class="q">${r.headcount??"—"}</td><td><input type="number" min="0" max="80" id="hc-${esc(r.key)}" data-hc="${esc(r.key)}" value="${esc(val)}" placeholder="${r.headcount??""}" aria-label="Headcount for ${esc(r.room)}"></td></tr>`}).join("");
-  $("#view").innerHTML=`<h2>Headcounts</h2><p class="sub">When a teacher leaves the count blank or writes “??”, the page uses that room's last number. Type last week's attendance in the right column to override it. Leave it blank to keep the number shown.</p>
+  $("#view").innerHTML=`<h2>Headcounts</h2><p class="sub">Fix any room marked “Needs a number.”</p>
   <div class="tablewrap"><table><thead><tr><th>Room</th><th>Teacher</th><th>Source</th><th>Using</th><th>Last week's attendance</th></tr></thead><tbody>${rows}</tbody></table></div>`;
 }
 function rPrintActs(){
@@ -3641,7 +3645,7 @@ function rPrintActs(){
   const whole=i=>{const P=i.parts;if(P.length<2||i.unknown||P.some(p=>p.pick)||new Set(P.map(p=>p.copies)).size>1)return "";
     const cov=P.reduce((s,p)=>s+(p.to-p.from+1),0);if(cov!==i.pdfPages)return "";
     return `<div class="whole">Print all ${i.pdfPages} pages, <b>${P[0].copies} ${P[0].copies===1?"copy":"copies"}</b></div>`};
-  let h=`<h2>Print</h2>${printSwitch()}<p class="sub">Biggest jobs first. Each row is one PDF with every page that activity needs. Tap Save PDF, then print each page range below it the number of times shown. Check the row off when every page is printed. About ${Math.ceil(tot)} sheets total${card?`, ${Math.ceil(card)} on cardstock`:""}.</p>
+  let h=`<h2>Print</h2>${printSwitch()}<p class="sub">One PDF per activity, biggest jobs first. About ${Math.ceil(tot)} sheets total${card?`, ${Math.ceil(card)} on cardstock`:""}.</p>
   <div class="tablewrap"><table><thead><tr><th style="width:36px"></th><th>Activity</th><th>Pages and how many</th><th>Rooms</th></tr></thead><tbody>`+
   items.map(i=>`<tr class="${S.prog.checks?.[i.id]?"done":""}"><td>${ck(i.id,"Printed "+i.activity)}</td>
     <td><b>${esc(i.activity)}</b>${i.group&&i.group!=="All"?` <span class="small">${esc(i.group)}</span>`:""}
@@ -3667,7 +3671,7 @@ function rPrint(){if(S.printView==="acts")return rPrintActs();
   const plainTot=list.reduce((t,x)=>t+(x.info.plain?packetSheets(x.info.plain)+1:0),0),cardTot=list.reduce((t,x)=>t+packetSheets(x.info.card),0);
   const anyMissing=list.some(x=>x.info.missing.length),anyCard=list.some(x=>x.info.card);
   const dis=DL===null?"disabled title=\"Downloads aren't available in this view\"":"";
-  let h=`<h2>Print</h2>${printSwitch()}<p class="sub">One packet per room. Tap Save packet, open it from your downloads, and print the whole file <b>two-sided</b> one time. The first sheet is a cover with the room and what's inside, so the stack sorts straight into bins. Blank pages are on purpose. About ${plainTot} sheets of paper${cardTot?` and ${cardTot} of cardstock`:""}.</p>
+  let h=`<h2>Print</h2>${printSwitch()}<p class="sub">One packet per room. Print each one <b>two-sided</b>. About ${plainTot} sheets of paper${cardTot?` and ${cardTot} of cardstock`:""}.</p>
   <div class="acts" style="margin-bottom:10px"><button class="btn primary" data-allpk="plain" ${dis}>Save every room in one file</button>${anyCard?`<button class="btn" data-allpk="card" ${dis}>Save all cardstock in one file</button>`:""}</div>
   ${anyMissing?'<p><span class="flag bad">Some rooms need a headcount</span> <span class="small">Those pages are left out of the packet until the number is set on the Headcounts tab.</span></p>':""}`;
   const bands=[...new Set(list.map(x=>band(x.r)))];
@@ -3737,7 +3741,7 @@ function rPreview(){
   const dl=new Date(W+"T12:00").toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric"});
   if(!P){v.innerHTML=`<h2>Preview</h2><div class="empty">The curriculum folder doesn't have a lesson for ${esc(dl)} yet.</div>`;return}
   const sec=S.pvSec||"acts";
-  let h=`<h2>Preview: ${esc(dl)}</h2><p class="sub"><b>${esc(P.title)}</b>. Every activity teachers can pick this week and what each one needs, before any forms come in. Use it to check stock and order early. The form closes Wednesday at noon.</p>
+  let h=`<h2>Preview: ${esc(dl)}</h2><p class="sub"><b>${esc(P.title)}</b>. Every activity teachers can pick, before any forms come in.</p>
   <div class="seg" role="group" aria-label="Preview view"><button class="btn ${sec==="acts"?"primary":""}" data-pvs="acts">By activity</button><button class="btn ${sec==="closet"?"primary":""}" data-pvs="closet">Everything, by closet</button></div>
   <p class="small"><b>Every room:</b> the Take-Home with Going Deeper on the back, 1 per kid, two-sided. <b>Only if asked:</b> the Take-Home Activities page${["Younger","Older"].filter(g=>P.takehome?.[W+"|"+g]?.activities?.coloring).length?` with the Coloring Page on the back (${["Younger","Older"].filter(g=>P.takehome?.[W+"|"+g]?.activities?.coloring).join(" and ")})`:""}, for rooms that pick “Coloring/Activity Page” on the form.</p>
   ${P.memory_verse?'<p><span class="flag ok">First Sunday</span> <span class="small">Every room gets the Memory Verse page this week, no matter what they pick.</span></p>':""}`;
@@ -3807,7 +3811,7 @@ function rPull(){
   const groups={};items.forEach(i=>{const inv=invOf(i.key);
     const g=!inv?"Not located yet":(inv.status==="out"||inv.status==="not_seen"||!inv.closet)?"Not in any closet":inv.closet;(groups[g] ||= []).push(i)});
   const order=[...CLOSETS,"Other","Not in any closet","Not located yet"];
-  let h=`<h2>Pull</h2><p class="sub">Totals are for every room combined. The rooms line shows how many each room gets so you can split them into bins.</p>`;
+  let h=`<h2>Pull</h2><p class="sub">Totals are for every room combined.</p>`;
   for(const g of order){const list=groups[g];if(!list)continue;
     h+=`<div class="closet">${esc(g)} <span class="count">${list.length} item${list.length>1?"s":""}</span></div><div class="tablewrap"><table><thead><tr><th style="width:36px"></th><th>Item</th><th>Total</th><th>Where / update</th></tr></thead><tbody>`+
     list.map(i=>{const inv=invOf(i.key),id="pull|"+i.key;
@@ -3830,7 +3834,7 @@ function binItems(r,J){
 }
 function rArrange(){
   const P=S.plan,J=printJobs(),hours=[...new Set(P.rooms.map(band))],c=S.prog.checks||{};
-  let h=`<h2>Breakroom bins</h2><p class="sub">One bin per room. Check off each thing as it goes in the bin. When everything is checked, the bin turns green on its own. Rooms that meet at two hours get two bins.</p>`;
+  let h=`<h2>Breakroom bins</h2><p class="sub">One bin per room. Rooms that meet at two hours get two bins.</p>`;
   const li=x=>`<li class="binitem ${c[x.id]?"done":""}"><label>${ck(x.id,"In the bin: "+x.t)}<span>${esc(x.t)}${x.note?` <span class="small">(${esc(x.note)})</span>`:""}${binCl(x.id)}</span></label></li>`;
   for(const hr of hours){
     h+=`<div class="hour">${esc(hr)}</div><div class="grid">`;
@@ -3854,7 +3858,7 @@ function rOrder(){
   const amz=t=>`https://www.amazon.com/s?k=${encodeURIComponent(t)}`;
   const label=k=>invOf(k)?.label||k;
   const sLabel=st=>st==="low"?'<span class="flag warn">Low</span>':st==="out"?'<span class="flag bad">Out</span>':'<span class="flag bad">Not in a closet</span>';
-  let h=`<h2>Order for this Sunday</h2><p class="sub">Items this week's rooms need that we don't have or are low on. Links open an Amazon search. Nothing is ordered automatically. Food items are a grocery run.</p>`;
+  let h=`<h2>Order for this Sunday</h2><p class="sub">What this week's rooms need that we don't have or are low on.</p>`;
   h+=need.length?`<div class="tablewrap"><table><thead><tr><th style="width:36px"></th><th>Item</th><th>Status</th><th>Need</th><th></th></tr></thead><tbody>${need.map(i=>{const v=invOf(i.key);return `<tr class="${S.prog.checks?.["order|"+i.key]?"done":""}"><td>${ck("order|"+i.key,"Ordered "+i.label)}</td><td><b>${esc(cap(label(i.key)))}</b><div class="small">${esc(v.note||"")}</div></td><td>${sLabel(v.status)}</td><td class="q">${i.total}</td><td><a href="${amz(label(i.key))}" target="_blank" rel="noopener">Amazon search</a></td></tr>`}).join("")}</tbody></table></div>`:`<div class="empty">Everything for this Sunday should be in a closet.</div>`;
   const up=(S.plan.upcoming||[]).map(u=>({...u,items:u.items.filter(i=>NEED(invOf(i.key)?.status)||invOf(i.key)?.status==="check")})).filter(u=>u.items.length);
   h+=`<h2>Order ahead</h2><p class="sub">The next three Sundays, straight from Brite. Anything we don't have, or that I couldn't confirm in the photos. Ordering now beats a Saturday run.</p>`;
@@ -4373,7 +4377,7 @@ $("#chatClear").onclick=()=>{CHAT.ctl?.abort();CHAT.turns=[];saveChat();drawChat
     const bad=r.filter(x=>!x.ok).length;
     v.innerHTML=`<h2>Health check</h2><p class="sub">Tests every piece of the app on Google right now. Only admins can see this.</p>
       <div class="next ${bad?"":"done"}"><span>${bad?"Look":"All good"}</span><b>${bad?`${bad} thing${bad>1?"s":""} need${bad>1?"":"s"} attention`:"Everything passed"}</b> <button class="btn" id="healthAgain">Check again</button></div>
-      <ol class="steps">${r.map(x=>`<li class="st-${x.ok?"done":"warn"}"><span class="dot" aria-hidden="true"></span><div class="tx"><b>${E(x.name)}</b><span class="lbl">${x.ok?"Pass":"Check"}</span><div>${E(x.detail)}</div></div><span class="small">${(x.ms/1000).toFixed(1)} s</span></li>`).join("")}</ol>`;
+      <ol class="steps">${r.map(x=>`<li class="st-${x.ok?"done":"warn"}"><span class="dot" aria-hidden="true"></span><div class="tx"><b>${E(x.name)}</b><span class="lbl">${x.ok?"Pass":"Check"}</span><div>${E(x.detail)}</div></div>${x.ms>2000?`<span class="small">slow: ${(x.ms/1000).toFixed(1)} s</span>`:""}</li>`).join("")}</ol>`;
   }
   document.addEventListener("click",e=>{if(e.target.id==="healthAgain")rHealth()});
 
@@ -4415,11 +4419,17 @@ $("#chatClear").onclick=()=>{CHAT.ctl?.abort();CHAT.turns=[];saveChat();drawChat
   window.__route=function(){if(S.tab==="home"){rHome();return true}if(S.tab==="health"){ME.admin?rHealth():(S.tab="home",rHome());return true}if(S.tab==="report"){ME.admin?rReport():(S.tab="home",rHome());return true}return false};
 
   /* ---------- tab tips (D3): a small ? next to each title instead of the big guide ---------- */
-  const TIP={home:"Each step of the week in order. The Next box shows what needs a person now. Tap a step to jump there."};
-  (function(){const how=document.getElementById("how");if(!how)return;
-    how.querySelectorAll("li").forEach(li=>{const b=li.querySelector("b");if(!b)return;const k={"Preview":"preview","Headcounts":"count","Print":"print","Pull":"pull","Breakroom bins":"arrange","Order & follow up":"order","Closet map":"closets"}[b.textContent.replace(/:$/,"").trim()];
-      if(k){const t=li.textContent.replace(/^[^:]+:\s*/,"");TIP[k]=t.charAt(0).toUpperCase()+t.slice(1)}});
-    const gen=how.querySelector("li");if(gen)TIP.general=gen.textContent})();
+  /* R1: each tab says it once. The short line under the title says what the screen is; the tip says how to use it. */
+  const TIP={
+    home:"Each step of the week in order. The Next box shows what needs a person now. Tap a step to jump there.",
+    preview:"Open this early in the week. It shows every activity teachers can pick and what each one needs. Switch to Everything, by closet to see what we don't have yet, so you can order early. The form closes Wednesday at noon.",
+    count:"When a teacher leaves the count blank or writes “??”, the app uses that room's last number. Type last week's attendance to override it, or leave it blank to keep the number shown. Every quantity in the app updates when a headcount changes.",
+    print:"Tap Save packet, open it from your downloads, and print the whole file two-sided one time. The first sheet is a cover with the room and what's inside, so the stack sorts straight into bins. Blank pages are on purpose. Rooms with cardstock activities also get a small cardstock packet, and the first Sunday of each month adds a Memory Verse page. Need to reprint one thing? Switch to By activity.",
+    pull:"Items are grouped by closet. Check each one off as you pull it. If it isn't where the page says, tap Found it in… or Can't find it. That's how the inventory learns. The rooms line shows how many each room gets.",
+    arrange:"Check off each thing as it goes in the bin. When everything is checked, the bin turns green on its own.",
+    order:"Links open an Amazon search. Nothing is ordered automatically. Food items are a grocery run. Teacher requests and rooms that haven't turned in the form are further down.",
+    closets:"Search any item to see its closet and shelf. Yellow “Confirm” means it wasn't clear in the photos: check it once and tap Found it in… so it turns green. The map updates every time someone taps Found it in… or Can't find it."
+  };
   const OPEN_NOW={};   /* a first-time tip stays open through re-draws until the person leaves that tab */
   function tips(v){
     const h2=v.querySelector(":scope > h2");if(!h2||h2.querySelector(".tipbtn"))return;const t=TIP[S.tab];if(!t)return;
@@ -4431,11 +4441,13 @@ $("#chatClear").onclick=()=>{CHAT.ctl?.abort();CHAT.turns=[];saveChat();drawChat
 
   /* ---------- per-screen touches ---------- */
   function touch(){
-    const v=$1("#view");if(!v)return;tips(v);
+    const v=$1("#view");if(!v)return;v.dataset.tab=S.tab||"";tips(v);
     const title=((v.querySelector("h2")||{}).textContent||"").replace(/\?$/,"").trim();
     // D1: tables on phones become labeled rows (checklist tables already stack their own way)
-    v.querySelectorAll(".tablewrap table:not(.pulltbl):not(.stack)").forEach(t=>{const hs=[...t.querySelectorAll("thead th")].map(x=>x.textContent.trim());
-      t.classList.add("stack");t.querySelectorAll("tbody tr").forEach(tr=>[...tr.children].forEach((td,i)=>{if(hs[i])td.setAttribute("data-label",hs[i])}))});
+    // R2: checklist tables (a checkbox in the first column) stack their own way; they only label the numbers and "used in"
+    v.querySelectorAll(".tablewrap table:not(.stack):not(.cklist)").forEach(t=>{const hs=[...t.querySelectorAll("thead th")].map(x=>x.textContent.trim());
+      const ck=!!t.querySelector("tbody tr td:first-child .ck"),keep=/^(Total|Need|Used in|Used by)$/;
+      t.classList.add(ck?"cklist":"stack");t.querySelectorAll("tbody tr").forEach(tr=>[...tr.children].forEach((td,i)=>{if(hs[i]&&(!ck||keep.test(hs[i])))td.setAttribute("data-label",hs[i])}))});
     // D2: "From form" and "Admin" are facts, not "done", so they lose the green
     if(/^Headcounts|^People/.test(title))v.querySelectorAll(".flag.ok").forEach(f=>{f.classList.remove("ok");f.classList.add("plain")});
     // D4 + D7: Preview cards line up, PDF buttons move to the bottom; a jump bar on phones
