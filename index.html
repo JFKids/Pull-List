@@ -2923,6 +2923,53 @@ ul.months{margin:0;padding-left:18px}ul.months .btn{padding:3px 10px;font-size:1
   .next .btn{margin-left:0}
 }
 
+/* ---------- N: getting around ---------- */
+/* N5: a step row on This week is one big button */
+ol.steps.tap li{display:block;padding:0}
+ol.steps .steprow{all:unset;box-sizing:border-box;display:grid;grid-template-columns:44px minmax(0,1fr) 22px;gap:12px;align-items:center;width:100%;padding:12px 14px;cursor:pointer;color:var(--ink);font:inherit}
+ol.steps .steprow .tx{display:block}
+ol.steps .steprow .t{display:block;font-size:15px}
+ol.steps .steprow:hover{background:var(--paper)}
+ol.steps .steprow:active{background:#efe8da}
+ol.steps .steprow:focus-visible{outline:3px solid var(--navy);outline-offset:-3px}
+ol.steps .chev{width:10px;height:10px;border-right:3px solid var(--ink);border-bottom:3px solid var(--ink);transform:rotate(-45deg);justify-self:center}
+/* the step circles use the same numbers as the tabs: 1 Headcounts to 5 Order; the form and curriculum rows have none */
+ol.steps.tap .dot::before{content:attr(data-n)}
+ol.steps.tap .st-done .dot::before{content:"\2713"}
+ol.steps.tap .st-warn .dot[data-n=""]::before{content:"!"}
+/* N4: group labels in the laptop side list */
+nav#tabs .navgroup{display:none}
+@media (min-width:900px){
+  nav#tabs .navgroup{display:block;font:700 11px var(--body);letter-spacing:.09em;text-transform:uppercase;color:var(--muted);padding:12px 12px 4px}
+  nav#tabs .navgroup:first-child{padding-top:2px}
+  nav#tabs .navgroup[hidden]{display:none}
+}
+@media (max-width:899px){
+  /* N3: the Sunday steps show their numbers on the phone tab bar too */
+  nav#tabs button .n,nav#tabs.open button .n{display:inline-grid;place-items:center;width:22px;height:22px;margin-right:8px;border:2px solid #fff;border-radius:50%;color:#fff;font:700 12px/1 var(--body);flex:none}
+  nav#tabs button[aria-selected=true] .n{border-color:var(--ink);background:var(--ink);color:#fff}
+  /* N1: the logo row slides up while scrolling down; the white band under the clock stays */
+  .topbar{transition:transform .28s cubic-bezier(.3,0,.2,1)}
+  html.bars-away .topbar{transform:translateY(calc(-100% + env(safe-area-inset-top,0px)))}
+  nav#tabs button,nav#tabs.open button{transition:min-height .25s cubic-bezier(.3,0,.2,1)}
+  html.bars-away nav#tabs button{min-height:44px}
+  /* N2: pull down to refresh replaces the Refresh button on touch phones */
+  #ptr{position:fixed;left:0;right:0;top:calc(env(safe-area-inset-top,0px) + 56px);z-index:13;display:flex;flex-direction:column;align-items:center;gap:6px;pointer-events:none;opacity:0;--p:0}
+  #ptr .ptr-bar{display:flex;gap:3px;width:90px;height:6px}
+  #ptr .ptr-bar i{flex:1;background:#d9d2c4;transition:background .1s}
+  #ptr .ptr-bar i:nth-child(1){background:color-mix(in srgb,#006cb4 calc(min(1,var(--p)*5) * 100%),#d9d2c4)}
+  #ptr .ptr-bar i:nth-child(2){background:color-mix(in srgb,#ea6854 calc(clamp(0,var(--p)*5 - 1,1) * 100%),#d9d2c4)}
+  #ptr .ptr-bar i:nth-child(3){background:color-mix(in srgb,#f8bd00 calc(clamp(0,var(--p)*5 - 2,1) * 100%),#d9d2c4)}
+  #ptr .ptr-bar i:nth-child(4){background:color-mix(in srgb,#7aca6e calc(clamp(0,var(--p)*5 - 3,1) * 100%),#d9d2c4)}
+  #ptr .ptr-bar i:nth-child(5){background:color-mix(in srgb,#83d9df calc(clamp(0,var(--p)*5 - 4,1) * 100%),#d9d2c4)}
+  #ptr .ptr-t{font:700 13px var(--body);color:var(--ink);background:var(--surface);border:2px solid var(--rule);padding:3px 8px}
+  #ptr.busy .ptr-bar i{animation:ptr-run .9s steps(1) infinite}
+  #ptr.busy .ptr-bar i:nth-child(2){animation-delay:.18s}#ptr.busy .ptr-bar i:nth-child(3){animation-delay:.36s}#ptr.busy .ptr-bar i:nth-child(4){animation-delay:.54s}#ptr.busy .ptr-bar i:nth-child(5){animation-delay:.72s}
+}
+@keyframes ptr-run{0%,100%{opacity:1}50%{opacity:.25}}
+@media (max-width:899px) and (pointer:coarse){#liveRefresh{display:none}}
+@media (prefers-reduced-motion:reduce){.topbar,nav#tabs button{transition:none!important}}
+
 </style>
 <header>
   <div class="wrap" style="padding-block:0">
@@ -4315,7 +4362,8 @@ $("#chatClear").onclick=()=>{CHAT.ctl?.abort();CHAT.turns=[];saveChat();drawChat
     if(ME.admin&&APP.formMissing&&APP.formMissing.length)h+=`<div class="banner bad"><b>The form changed.</b> These questions can't be found anymore: ${E(APP.formMissing.join(", "))}. Rooms may be missing answers. Rename them back, or tell Claude what changed.</div>`;
     if(next)h+=`<div class="next"><span>Next</span><b>${E(next.n)}</b> ${E(next.text)} <button class="btn primary" data-goto="${next.tab}">${E(next.go)}</button></div>`;
     else h+=`<div class="next done"><span>Ready</span><b>Everything is done for this Sunday.</b></div>`;
-    h+=`<ol class="steps">${st.map(s=>`<li class="st-${s.state}"><span class="dot" aria-hidden="true"></span><div class="tx"><b>${E(s.n)}</b><span class="lbl">${LABEL[s.state]}</span><div>${E(s.text)}</div></div><button class="btn" data-goto="${s.tab}">${E(s.go)}</button></li>`).join("")}</ol>`;
+    /* N5: the whole step row is one button */
+    h+=`<ol class="steps tap">${st.map(s=>`<li class="st-${s.state}"><button type="button" class="steprow" data-goto="${s.tab}" aria-label="${E(s.n)}: ${LABEL[s.state]}. ${E(s.text)}. Open ${E(s.go)}"><span class="dot" aria-hidden="true" data-n="${({count:1,print:2,pull:3,arrange:4,order:5})[s.tab]&&s.n!=="Materials Request form"?({count:1,print:2,pull:3,arrange:4,order:5})[s.tab]:""}"></span><span class="tx"><b>${E(s.n)}</b><span class="lbl">${LABEL[s.state]}</span><span class="t">${E(s.text)}</span></span><span class="chev" aria-hidden="true"></span></button></li>`).join("")}</ol>`;
     h+=`<div class="homecols"><section class="panel" id="monthPanel"><h3>Curriculum months</h3><div class="small">Loading…</div></section><section class="panel" id="alertPanel"><h3>Alerts on this phone</h3><div class="small">Checking…</div></section></div>`;
     v.innerHTML=h;
     monthPanel();alertPanel();
@@ -4500,6 +4548,43 @@ $("#chatClear").onclick=()=>{CHAT.ctl?.abort();CHAT.turns=[];saveChat();drawChat
       nb.disabled=true;try{const r=await APP.run("newKey",{id:nb.dataset.newkey});audit("People",`New link for ${r.name}`);toast(`${r.name} has a new link. Send it to them.`);await rPeople(true)}catch(err){toast("Couldn't make a new link. "+(err.message||""))}finally{nb.disabled=false}}
   });
   if(v0)new MutationObserver(()=>peopleTools()).observe(v0,{childList:true,subtree:true});
+
+  /* ---------- N: getting around ---------- */
+  const phone2=()=>matchMedia("(max-width:899px)").matches;
+  document.addEventListener("click",e=>{if(e.target.closest("button.steprow"))window.scrollTo(0,0)});
+
+  /* N1: on phones the logo row slides up while you scroll down and comes back when you scroll up.
+     The white band under the clock always stays, so nothing scrolls under the status bar. The tab bar gets a little shorter too. */
+  (function(){let lastY=scrollY,acc=0,tick=false;const root=document.documentElement;
+    function set(h){if(root.classList.contains("bars-away")===h)return;root.classList.toggle("bars-away",h)}
+    addEventListener("scroll",()=>{if(tick)return;tick=true;requestAnimationFrame(()=>{tick=false;const y=scrollY,d=y-lastY;lastY=y;
+      if(!phone2()||y<60){acc=0;set(false);return}
+      if(Math.sign(d)!==Math.sign(acc))acc=0;acc+=d;
+      if(acc>24)set(true);else if(acc<-16)set(false)})},{passive:true});
+    document.addEventListener("click",e=>{if(e.target.closest("#tabs button, .topbar"))set(false)});
+  })();
+
+  /* N2: pull down to refresh on phones; the Refresh button stays on laptops */
+  (function(){if(!("ontouchstart" in window))return;
+    const ind=document.createElement("div");ind.id="ptr";ind.setAttribute("aria-hidden","true");ind.innerHTML='<span class="ptr-bar"><i></i><i></i><i></i><i></i><i></i></span><span class="ptr-t">Pull to refresh</span>';document.body.appendChild(ind);
+    let y0=null,pull=0,armed=false;const NEED=80;
+    const canRefresh=()=>document.getElementById("liveRefresh");
+    addEventListener("touchstart",e=>{if(!phone2()||scrollY>2||e.touches.length!==1||e.target.closest("input,textarea,select,#tabs,.pl-ring,#pl-load")||!canRefresh()){y0=null;return}y0=e.touches[0].clientY;pull=0;armed=false},{passive:true});
+    addEventListener("touchmove",e=>{if(y0==null)return;pull=Math.max(0,e.touches[0].clientY-y0);if(scrollY>2){y0=null;ind.style.cssText="";return}
+      const p=Math.min(1,pull/NEED);ind.style.transform=`translateY(${Math.min(pull*.5,48)}px)`;ind.style.opacity=String(Math.min(1,pull/30));ind.style.setProperty("--p",p);
+      if(p>=1&&!armed){armed=true;ind.querySelector(".ptr-t").textContent="Let go to refresh"}else if(p<1&&armed){armed=false;ind.querySelector(".ptr-t").textContent="Pull to refresh"}},{passive:true});
+    addEventListener("touchend",()=>{if(y0==null)return;y0=null;const b=canRefresh();
+      if(armed&&b){ind.querySelector(".ptr-t").textContent="Checking the form…";ind.classList.add("busy");b.click();setTimeout(()=>{ind.classList.remove("busy");ind.style.cssText="";ind.querySelector(".ptr-t").textContent="Pull to refresh"},1200)}
+      else ind.style.cssText="";armed=false},{passive:true});
+  })();
+
+  /* N4: the laptop side list gets group labels */
+  (function(){const nav=document.getElementById("tabs");if(!nav)return;
+    const groups=[["home","This Sunday"],["closets","Supplies"],["log","Admin"]];
+    groups.forEach(([t,label])=>{const b=nav.querySelector(`button[data-t="${t}"]`);if(b&&!b.previousElementSibling?.classList?.contains("navgroup"))b.insertAdjacentHTML("beforebegin",`<span class="navgroup" data-g="${t}">${label}</span>`)});
+    const fix=()=>{nav.querySelectorAll(".navgroup").forEach(g=>{let n=g.nextElementSibling,any=false;while(n&&!n.classList.contains("navgroup")){if(n.matches("button[data-t]")&&!n.hidden)any=true;n=n.nextElementSibling}g.hidden=!any})};
+    fix();new MutationObserver(fix).observe(nav,{subtree:true,attributes:true,attributeFilter:["hidden"]});
+  })();
 })();
 
 </script>
