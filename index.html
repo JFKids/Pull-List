@@ -2970,6 +2970,61 @@ nav#tabs .navgroup{display:none}
 @media (max-width:899px) and (pointer:coarse){#liveRefresh{display:none}}
 @media (prefers-reduced-motion:reduce){.topbar,nav#tabs button{transition:none!important}}
 
+/* ---------- P: phone in one hand ---------- */
+/* P1: bigger tap targets everywhere, without growing the look */
+.tipbtn{position:relative}
+.tipbtn::after{content:"";position:absolute;inset:-7px}                    /* 30px circle, 44px tap area */
+#liveRefresh{min-height:36px;padding:6px 14px}
+#view[data-tab="order"] td a[href*="amazon"]{display:inline-block;padding:12px 2px;min-height:44px;box-sizing:border-box}
+label:has(#newAdmin){min-height:44px;padding:0 4px;cursor:pointer}
+#newAdmin{width:24px;height:24px;accent-color:var(--navy)}
+ul.bin li.binitem label{display:flex;align-items:center;gap:10px;min-height:44px;cursor:pointer}
+label.binrow{display:flex;align-items:center;gap:10px;min-height:48px;cursor:pointer}
+table.cklist tr.tap{cursor:pointer}
+label.ckhit{display:inline-flex;align-items:center;justify-content:center;min-width:44px;min-height:44px;margin:-8px -8px -8px -8px;cursor:pointer;flex:none}
+table.stack label.ckhit{margin:0}
+ul.months .btn,.jump a{min-height:44px;display:inline-flex;align-items:center}
+table.cklist tr.tap:active{background:#efe8da}
+@media (max-width:899px){
+  .ck{width:30px;height:30px}
+  /* P3: one Update button; the three choices open under it */
+  td .btn.upd{margin-top:6px;min-height:44px}
+  td .acts{margin-top:6px}
+  /* P2: one bin at a time */
+  .binbar{margin:4px 0 8px}
+  .binbar .btn{min-height:44px}
+  #view.binfold .grid{display:grid;grid-template-columns:minmax(0,1fr);gap:10px}
+  #view.binfold .card{scroll-margin-top:calc(var(--tb,0px) + 56px)}
+  #view.binfold .card:not(.open) > :not(h3):not(.who):not(.fsum){display:none}
+  #view.binfold .card:not(.open){padding-bottom:0}
+  .fsum{display:flex;align-items:center;justify-content:space-between;width:calc(100% + 28px);margin:10px -14px 0;padding:0 14px;min-height:48px;border:0;border-top:1px dashed #b9b1a2;background:transparent;color:var(--ink);font:400 15px var(--body);cursor:pointer;text-align:left}
+  .fsum b{font-weight:800}
+  .fsum i{width:9px;height:9px;border-right:3px solid var(--ink);border-bottom:3px solid var(--ink);transform:rotate(45deg);margin:0 6px 4px}
+  .fsum[aria-expanded="true"] i{transform:rotate(-135deg);margin-bottom:-4px}
+  /* P5: Closet map folds by closet unless you're searching */
+  #view.clofold > .closet{cursor:pointer;display:flex;align-items:center;gap:10px;min-height:52px}
+  #view.clofold > .closet::after{content:"";width:9px;height:9px;border-right:3px solid currentColor;border-bottom:3px solid currentColor;transform:rotate(45deg);margin:0 4px 4px 0}
+  #view.clofold > .closet.open::after{transform:rotate(-135deg);margin-bottom:-4px}
+  #view.clofold > .closet .count{margin-left:auto}
+  #view.clofold > .closet:not(.open) + .tablewrap{display:none}
+  #view.clofold > .closet:focus-visible{outline:3px solid var(--yellow);outline-offset:2px}
+  /* P4: Headcounts as one compact row per room */
+  #view[data-tab="count"] table.stack tr{display:grid;grid-template-columns:minmax(0,1fr) 92px;grid-template-areas:"room box" "who box" "meta box";column-gap:12px;row-gap:2px;align-items:center;padding:10px 12px}
+  #view[data-tab="count"] table.stack td{display:block;padding:0}
+  #view[data-tab="count"] table.stack td::before{display:none}
+  #view[data-tab="count"] table.stack td:nth-child(1){grid-area:room;font-size:17px}
+  #view[data-tab="count"] table.stack td:nth-child(2){grid-area:who;font-size:15px}
+  #view[data-tab="count"] table.stack td:nth-child(2) .small{display:inline;margin-left:6px}
+  #view[data-tab="count"] table.stack td:nth-child(3){grid-area:meta;display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:14px}
+  #view[data-tab="count"] table.stack td:nth-child(4){display:none}
+  #view[data-tab="count"] table.stack td:nth-child(5){grid-area:box;align-self:center}
+  #view[data-tab="count"] table.stack td:nth-child(5)::before{display:block;content:"Last week";font:700 11px var(--body);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-bottom:3px}
+  #view[data-tab="count"] table.stack td:nth-child(5) input{width:100%;min-height:44px;font-size:18px;box-sizing:border-box}
+  #view[data-tab="count"] table.stack td:nth-child(3)::after{content:"Using " attr(data-using);font-weight:700}
+}
+/* P6: progress stays in view on Pull and Bins */
+#view[data-tab="pull"] > .prog,#view[data-tab="arrange"] > .prog{position:sticky;top:var(--tb,0px);z-index:6;background:var(--paper);padding:8px 0;margin:0 0 4px;max-width:none;transition:top .28s cubic-bezier(.3,0,.2,1)}
+
 </style>
 <header>
   <div class="wrap" style="padding-block:0">
@@ -4473,7 +4528,7 @@ $("#chatClear").onclick=()=>{CHAT.ctl?.abort();CHAT.turns=[];saveChat();drawChat
     preview:"Open this early in the week. It shows every activity teachers can pick and what each one needs. Switch to Everything, by closet to see what we don't have yet, so you can order early. The form closes Wednesday at noon.",
     count:"When a teacher leaves the count blank or writes “??”, the app uses that room's last number. Type last week's attendance to override it, or leave it blank to keep the number shown. Every quantity in the app updates when a headcount changes.",
     print:"Tap Save packet, open it from your downloads, and print the whole file two-sided one time. The first sheet is a cover with the room and what's inside, so the stack sorts straight into bins. Blank pages are on purpose. Rooms with cardstock activities also get a small cardstock packet, and the first Sunday of each month adds a Memory Verse page. Need to reprint one thing? Switch to By activity.",
-    pull:"Items are grouped by closet. Check each one off as you pull it. If it isn't where the page says, tap Found it in… or Can't find it. That's how the inventory learns. The rooms line shows how many each room gets.",
+    pull:"Items are grouped by closet. Check each one off as you pull it. If it isn't where the page says, tap Update, then Found it in… or Can't find it. That's how the inventory learns. Tap anywhere on a row to check it off. The rooms line shows how many each room gets.",
     arrange:"Check off each thing as it goes in the bin. When everything is checked, the bin turns green on its own.",
     order:"Links open an Amazon search. Nothing is ordered automatically. Food items are a grocery run. Teacher requests and rooms that haven't turned in the form are further down.",
     closets:"Search any item to see its closet and shelf. Yellow “Confirm” means it wasn't clear in the photos: check it once and tap Found it in… so it turns green. The map updates every time someone taps Found it in… or Can't find it."
@@ -4509,7 +4564,66 @@ $("#chatClear").onclick=()=>{CHAT.ctl?.abort();CHAT.turns=[];saveChat();drawChat
     if(title==="Print"&&phone()&&S.plan){const all=v.querySelector('button[data-allpk="plain"]');if(all&&!all.dataset.split){all.dataset.split="1";
       const hours=[...new Set(S.plan.rooms.map(r=>r.hour))].filter(h=>h&&h!=="?");
       all.insertAdjacentHTML("afterend",hours.map(h=>`<button class="btn primary" data-allhour="${E(h)}">Save ${E(h)} rooms</button>`).join(""));all.remove()}}
+    pTouch(v);
   }
+
+  /* ---------- P: phone in one hand ---------- */
+  const BIN={open:null,ready:new Set(),all:false},CLO={open:new Set()};
+  function pTouch(v){
+    const tab=S.tab;
+    // P1: on checklist rows, a tap anywhere on the row checks the box (buttons, links and fields inside keep their own job)
+    v.querySelectorAll("table.cklist tbody tr").forEach(tr=>{if(tr.querySelector("td:first-child .ck"))tr.classList.add("tap")});
+    // P1: any other lone checkbox gets a 44 by 44 tap area around it
+    v.querySelectorAll("input[type=checkbox]").forEach(c=>{if(c.closest("label")||c.closest("tr.tap"))return;
+      const l=document.createElement("label");l.className="ckhit";c.replaceWith(l);l.appendChild(c)});
+    // P3: one Update button per Pull item instead of three
+    if(tab==="pull")v.querySelectorAll("td .acts:not([data-one])").forEach(a=>{a.dataset.one="1";a.hidden=true;
+      a.insertAdjacentHTML("beforebegin",`<button type="button" class="btn upd" aria-expanded="false">Update</button>`)});
+    // the fold classes belong to their own tab only (the #view element is reused across tabs)
+    if(tab!=="arrange")v.classList.remove("binfold");if(tab!=="closets")v.classList.remove("clofold");
+    // P2: Bins one room at a time on phones
+    if(tab==="arrange")foldBins(v);
+    // P4: Headcounts rows show "Using N" next to the source tag
+    if(tab==="count")v.querySelectorAll("table.stack tbody tr").forEach(tr=>{const t=tr.children;if(t[2]&&t[3])t[2].dataset.using=t[3].textContent.trim()});
+    // P5: Closet map folds by closet on phones
+    if(tab==="closets")foldClosets(v);
+  }
+  function binKey(card){const c=card.querySelector(".binrow .ck");return c?c.dataset.ck:""}
+  function foldBins(v){
+    const cards=[...v.querySelectorAll(".grid > .card")];if(!cards.length)return;
+    const fold=phone();v.classList.toggle("binfold",fold);
+    if(!v.querySelector(".binbar")){const sub=v.querySelector(":scope > .prog")||v.querySelector(":scope > p.sub");
+      if(sub)sub.insertAdjacentHTML("afterend",`<div class="binbar"><button type="button" class="btn" data-binall>${BIN.all?"Fold up":"Open all"}</button></div>`)}
+    // when the open bin was just finished, move on to the next one that isn't ready
+    const nowReady=new Set(cards.filter(c=>c.classList.contains("ready")).map(binKey));
+    const justDone=BIN.open&&nowReady.has(BIN.open)&&!BIN.ready.has(BIN.open);
+    if(BIN.open===null||justDone||(BIN.open&&!cards.some(c=>binKey(c)===BIN.open))){const at=cards.findIndex(c=>binKey(c)===BIN.open);
+      const next=cards.slice(at+1).concat(cards.slice(0,at+1)).find(c=>!c.classList.contains("ready"));BIN.open=next?binKey(next):null;
+      if(justDone&&next&&fold)setTimeout(()=>next.scrollIntoView({behavior:matchMedia("(prefers-reduced-motion: reduce)").matches?"auto":"smooth",block:"start"}),60)}
+    BIN.ready=nowReady;
+    cards.forEach(c=>{const k=binKey(c),open=BIN.all||k===BIN.open;c.classList.toggle("open",open);
+      if(!c.querySelector(".fsum")){const t=(c.querySelector(".binrow .small")||{}).textContent||"",m=t.match(/(\d+) of (\d+)/);
+        const who=c.querySelector(".who");(who||c.querySelector("h3")).insertAdjacentHTML("afterend",`<button type="button" class="fsum" data-bin="${E(k)}" aria-expanded="${open}"><span>${c.classList.contains("ready")?"<b>Ready</b>":m?`${m[1]} of ${m[2]} in the bin`:"Open"}</span><i aria-hidden="true"></i></button>`)}
+      else c.querySelector(".fsum").setAttribute("aria-expanded",String(open))});
+  }
+  function foldClosets(v){
+    const q=(S.find||"").trim();v.classList.toggle("clofold",phone()&&!q);
+    v.querySelectorAll(":scope > .closet").forEach(h=>{const name=h.firstChild?h.firstChild.textContent.trim():"";h.dataset.c=h.dataset.c||name;
+      const open=CLO.open.has(name);h.classList.toggle("open",open);h.setAttribute("role","button");h.tabIndex=0;h.setAttribute("aria-expanded",String(open||!!q))});
+  }
+  document.addEventListener("click",e=>{
+    // P1 row tap: anywhere on a checklist row except its own buttons, links and fields
+    const tr=e.target.closest("table.cklist tr.tap");
+    if(tr&&!e.target.closest("button,a,input,select,textarea,label,.inline-form")){const c=tr.querySelector("td:first-child .ck");if(c){c.click();return}}
+    const u=e.target.closest("button.upd");if(u){const a=u.nextElementSibling;if(a&&a.classList.contains("acts")){a.hidden=!a.hidden;u.setAttribute("aria-expanded",String(!a.hidden));u.textContent=a.hidden?"Update":"Close"}return}
+    const f=e.target.closest("button.fsum");if(f){const k=f.dataset.bin;BIN.all=false;BIN.open=BIN.open===k?"":k;foldBins($1("#view"));return}
+    const all=e.target.closest("button[data-binall]");if(all){BIN.all=!BIN.all;all.textContent=BIN.all?"Fold up":"Open all";foldBins($1("#view"));return}
+    const h=e.target.closest("#view.clofold > .closet");if(h){const n=h.dataset.c;CLO.open.has(n)?CLO.open.delete(n):CLO.open.add(n);foldClosets($1("#view"))}
+  });
+  document.addEventListener("keydown",e=>{if((e.key==="Enter"||e.key===" ")&&e.target.matches("#view.clofold > .closet")){e.preventDefault();e.target.click()}});
+  // P6: the progress bar sticks just under whatever is showing at the top
+  (function(){const tb=document.querySelector(".topbar");let t=false;const set=()=>{t=false;const b=tb&&getComputedStyle(tb).display!=="none"?Math.max(0,tb.getBoundingClientRect().bottom):0;document.documentElement.style.setProperty("--tb",b+"px")};
+    const go=()=>{if(!t){t=true;requestAnimationFrame(set)}};addEventListener("scroll",go,{passive:true});addEventListener("resize",go);if(tb)tb.addEventListener("transitionend",go);setTimeout(set,500)})();
   document.addEventListener("click",e=>{const j=e.target.closest("[data-jump]");if(j){e.preventDefault();const t=document.getElementById(j.dataset.jump);if(t)t.scrollIntoView({behavior:"smooth",block:"start"})}});
   document.addEventListener("click",e=>{const b=e.target.closest("button[data-allhour]");if(!b)return;e.preventDefault();
     const h=b.dataset.allhour,list=roomPackets().filter(x=>x.r.hour===h);savePacket(b,list,"plain",`${S.plan.sunday} ${h.replace(":","")} rooms packets.pdf`)});
