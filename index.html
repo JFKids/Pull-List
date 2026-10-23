@@ -3025,6 +3025,30 @@ table.cklist tr.tap:active{background:#efe8da}
 /* P6: progress stays in view on Pull and Bins */
 #view[data-tab="pull"] > .prog,#view[data-tab="arrange"] > .prog{position:sticky;top:var(--tb,0px);z-index:6;background:var(--paper);padding:8px 0;margin:0 0 4px;max-width:none;transition:top .28s cubic-bezier(.3,0,.2,1)}
 
+/* ---------- L1: laptops use the width ---------- */
+@media (min-width:900px){
+  .bandwrap{display:flex;flex-wrap:wrap;gap:8px 28px;align-items:flex-start}
+  .band{flex:0 1 auto;max-width:100%;min-width:0}
+  .band > .hour{margin-top:18px}
+  .band > .grid{grid-template-columns:repeat(var(--n),minmax(280px,320px))}
+  #view[data-tab="pull"] .tablewrap,#view[data-tab="order"] .tablewrap{max-width:none}
+}
+@media (min-width:900px) and (max-width:1180px){.band > .grid{grid-template-columns:repeat(min(var(--n),2),minmax(280px,1fr))}}
+
+/* ---------- M1: check-offs feel finished ---------- */
+.ck{appearance:none;-webkit-appearance:none;margin:0;display:inline-grid;place-items:center;box-sizing:border-box;border:2px solid var(--rule);background:var(--surface);border-radius:3px;cursor:pointer;flex:none;vertical-align:middle}
+.ck::after{content:"";width:28%;height:52%;border-right:3px solid #17202a;border-bottom:3px solid #17202a;transform:translateY(-12%) rotate(45deg) scale(0);transform-origin:50% 50%}
+.ck:checked{background:var(--lgreen)}
+.ck:checked::after{transform:translateY(-12%) rotate(45deg) scale(1)}
+.ck.just:checked::after{animation:ck-draw .16s cubic-bezier(.2,0,.2,1)}
+.ck:focus-visible{outline:3px solid var(--navy);outline-offset:2px}
+@keyframes ck-draw{from{transform:translateY(-12%) rotate(45deg) scale(.3);opacity:.2}to{transform:translateY(-12%) rotate(45deg) scale(1);opacity:1}}
+.sweep{position:relative;overflow:hidden}
+.sweep::before{content:"";position:absolute;left:0;right:0;top:0;height:6px;z-index:2;background:linear-gradient(90deg,#006cb4 0 20%,#ea6854 20% 40%,#f8bd00 40% 60%,#7aca6e 60% 80%,#83d9df 80% 100%);transform-origin:0 50%;animation:sweep .7s cubic-bezier(.3,0,.2,1) forwards}
+@keyframes sweep{0%{transform:scaleX(0)}55%{transform:scaleX(1);opacity:1}100%{transform:scaleX(1);opacity:0}}
+@media (prefers-reduced-motion:reduce){.ck.just:checked::after{animation:none}.sweep::before{display:none}}
+@media (min-width:900px){.fsum,.binbar{display:none!important}}
+
 </style>
 <header>
   <div class="wrap" style="padding-block:0">
@@ -4583,6 +4607,11 @@ $("#chatClear").onclick=()=>{CHAT.ctl?.abort();CHAT.turns=[];saveChat();drawChat
     if(tab!=="arrange")v.classList.remove("binfold");if(tab!=="closets")v.classList.remove("clofold");
     // P2: Bins one room at a time on phones
     if(tab==="arrange")foldBins(v);
+    // L1: on laptops, Print and Bins hour groups sit side by side when they're small, so the width gets used
+    if((tab==="print"||tab==="arrange")&&!v.querySelector(".bandwrap")&&!phone()){const hours=[...v.querySelectorAll(":scope > .hour")];
+      if(hours.length){const wrap=document.createElement("div");wrap.className="bandwrap";hours[0].before(wrap);
+        hours.forEach(h=>{const g=h.nextElementSibling;const sec=document.createElement("section");sec.className="band";const n=g&&g.classList.contains("grid")?g.children.length:1;
+          sec.style.setProperty("--n",Math.min(n,3));wrap.appendChild(sec);sec.appendChild(h);if(g&&g.classList.contains("grid"))sec.appendChild(g)})}}
     // P4: Headcounts rows show "Using N" next to the source tag
     if(tab==="count")v.querySelectorAll("table.stack tbody tr").forEach(tr=>{const t=tr.children;if(t[2]&&t[3])t[2].dataset.using=t[3].textContent.trim()});
     // P5: Closet map folds by closet on phones
@@ -4699,6 +4728,35 @@ $("#chatClear").onclick=()=>{CHAT.ctl?.abort();CHAT.turns=[];saveChat();drawChat
     const fix=()=>{nav.querySelectorAll(".navgroup").forEach(g=>{let n=g.nextElementSibling,any=false;while(n&&!n.classList.contains("navgroup")){if(n.matches("button[data-t]")&&!n.hidden)any=true;n=n.nextElementSibling}g.hidden=!any})};
     fix();new MutationObserver(fix).observe(nav,{subtree:true,attributes:true,attributeFilter:["hidden"]});
   })();
+
+  /* ---------- M: motion and feedback ---------- */
+  const calm=()=>matchMedia("(prefers-reduced-motion: reduce)").matches;
+  // M1: the box that was just checked draws its check; finishing a bin or a closet plays a quick stripe sweep
+  let lastCk=null;
+  document.addEventListener("change",e=>{const c=e.target;if(c.classList&&c.classList.contains("ck")&&c.dataset.ck&&c.checked){lastCk={id:c.dataset.ck,at:Date.now()};c.classList.add("just")}},true);
+  const groupsDone=new Map();
+  function feel(v){
+    if(lastCk&&Date.now()-lastCk.at<900){const c=v.querySelector(`.ck[data-ck="${CSS.escape(lastCk.id)}"]`);if(c&&c.checked)c.classList.add("just")}
+    if(calm())return;
+    // a closet group on Pull is finished: every row in its table checked
+    if(S.tab==="pull")v.querySelectorAll(":scope > .closet").forEach(h=>{const t=h.nextElementSibling,cks=t?[...t.querySelectorAll(".ck")]:[];const k="pull|"+(h.firstChild?h.firstChild.textContent.trim():"");
+      const done=cks.length>0&&cks.every(x=>x.checked),was=groupsDone.get(k);groupsDone.set(k,done);if(done&&was===false)sweep(h)});
+    if(S.tab==="arrange")v.querySelectorAll(".grid > .card").forEach(c=>{const ck=c.querySelector(".binrow .ck");if(!ck)return;const k=ck.dataset.ck,done=c.classList.contains("ready"),was=groupsDone.get(k);groupsDone.set(k,done);if(done&&was===false)sweep(c)});
+  }
+  function sweep(el){el.classList.remove("sweep");void el.offsetWidth;el.classList.add("sweep");setTimeout(()=>el.classList.remove("sweep"),900)}
+  // M2: switching tabs fades the new screen in
+  let lastTab=null;
+  function fadeIn(v){if(S.tab===lastTab)return;const first=lastTab===null;lastTab=S.tab;if(first||calm()||!v.animate)return;
+    v.animate([{opacity:0,transform:"translateY(4px)"},{opacity:1,transform:"none"}],{duration:160,easing:"cubic-bezier(.2,0,.2,1)"})}
+  const vM=document.getElementById("view");if(vM)new MutationObserver(()=>{feel(vM);fadeIn(vM)}).observe(vM,{childList:true});
+
+  /* ---------- A1: follow the iPhone's text size (Settings > Display & Brightness > Text Size, or Larger Text) ---------- */
+  (function(){try{if(!(window.CSS&&CSS.supports("font","-apple-system-body")))return;
+    const probe=document.createElement("span");probe.style.cssText="font:-apple-system-body;position:absolute;visibility:hidden";probe.textContent="x";document.body.appendChild(probe);
+    const px=parseFloat(getComputedStyle(probe).fontSize);probe.remove();if(!px)return;
+    const pct=Math.round(Math.max(.85,Math.min(1.6,px/17))*100);   /* 17pt is the iPhone's default size */
+    if(pct!==100){document.documentElement.style.webkitTextSizeAdjust=pct+"%";document.documentElement.style.textSizeAdjust=pct+"%";document.documentElement.dataset.textsize=pct}
+  }catch(_){}})();
 })();
 
 </script>
