@@ -15,8 +15,8 @@
 <link rel="icon" type="image/png" sizes="64x64" href="favicon.png">
 <style>html.hosted header{padding-top:env(safe-area-inset-top,0px)}@media (max-width:899px){html.hosted nav#tabs{padding-bottom:calc(10px + env(safe-area-inset-bottom,0px))!important}html.hosted main.wrap{padding-bottom:calc(120px + env(safe-area-inset-bottom,0px))}}</style>
 <script>document.documentElement.classList.add("hosted")</script>
-<script>(function(){var ios=/iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator.platform==="MacIntel"&&navigator.maxTouchPoints>1);if(!ios){var l=document.createElement("link");l.rel="manifest";l.href="manifest.webmanifest";document.head.appendChild(l)}if("serviceWorker" in navigator)addEventListener("load",function(){navigator.serviceWorker.register("sw.js").catch(function(){})});var D="pl-data-v1",K=function(op,a){return location.origin+"/__d/"+op+"/"+encodeURIComponent(JSON.stringify(a||{}))},bar=null;window.__dc={keep:function(op,a){return /^(whoami|months|formCsv|get|list|people)$/.test(op)||(op==="file"&&/^engine\//.test((a&&a.path)||""))},put:function(op,a,d){try{caches.open(D).then(function(c){c.put(K(op,a),new Response(JSON.stringify(d)))})}catch(_){}},get:async function(op,a){try{var c=await caches.open(D),r=await c.match(K(op,a));return r?await r.json():undefined}catch(_){return undefined}},offline:function(){if(bar)return;bar=document.createElement("div");bar.id="offbar";bar.setAttribute("role","status");bar.textContent="No signal. Showing the last saved list. Checkmarks save when you are back online.";document.body.appendChild(bar)},online:function(){if(bar){bar.remove();bar=null}}};})()</script>
-<style>#offbar{position:fixed;left:0;right:0;bottom:0;z-index:60;background:#f8bd00;color:#17202a;font:700 14px Atkinson Hyperlegible,system-ui,sans-serif;padding:10px 16px calc(10px + env(safe-area-inset-bottom,0px));border-top:3px solid #17202a}@media (max-width:899px){#offbar{bottom:calc(74px + env(safe-area-inset-bottom,0px));padding-bottom:10px}}@media (min-width:900px){#offbar{left:264px}}</style>
+<script>(function(){var ios=/iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator.platform==="MacIntel"&&navigator.maxTouchPoints>1);if(!ios){var l=document.createElement("link");l.rel="manifest";l.href="manifest.webmanifest";document.head.appendChild(l)}if("serviceWorker" in navigator){addEventListener("load",function(){navigator.serviceWorker.register("sw.js").catch(function(){});navigator.serviceWorker.ready.then(function(r){r.active&&r.active.postMessage({type:"pl-ask"})})});navigator.serviceWorker.addEventListener("message",function(e){if(e.data&&e.data.type==="pl-update")window.__plUpdate()})}window.__plUpdate=function(){var go=function(){if(document.getElementById("updbar"))return;var b=document.createElement("div");b.id="updbar";b.setAttribute("role","status");b.innerHTML='<span>A new version of the Pull List is ready.</span><button type="button">Update</button>';b.querySelector("button").onclick=function(){location.reload()};document.body.appendChild(b)};document.body?go():document.addEventListener("DOMContentLoaded",go)};var D="pl-data-v1",K=function(op,a){return location.origin+"/__d/"+op+"/"+encodeURIComponent(JSON.stringify(a||{}))},bar=null;window.__dc={keep:function(op,a){return /^(whoami|months|formCsv|get|list|people)$/.test(op)||(op==="file"&&/^engine\//.test((a&&a.path)||""))},put:function(op,a,d){try{caches.open(D).then(function(c){c.put(K(op,a),new Response(JSON.stringify(d)))})}catch(_){}},get:async function(op,a){try{var c=await caches.open(D),r=await c.match(K(op,a));return r?await r.json():undefined}catch(_){return undefined}},offline:function(){if(bar)return;var fb=document.getElementById("freshbar");if(fb&&fb.className==="failed")return;bar=document.createElement("div");bar.id="offbar";bar.setAttribute("role","status");bar.textContent="No signal. Showing the last saved list. Checkmarks save when you are back online.";document.body.appendChild(bar)},online:function(){if(bar){bar.remove();bar=null}}};})()</script>
+<style>#updbar{position:fixed;left:50%;top:calc(10px + env(safe-area-inset-top,0px));transform:translateX(-50%);z-index:62;display:flex;gap:12px;align-items:center;width:max-content;max-width:calc(100% - 32px);box-sizing:border-box;background:#f8bd00;color:#17202a;border:3px solid #17202a;padding:8px 8px 8px 14px;font:700 14px/1.3 Atkinson Hyperlegible,system-ui,sans-serif}#updbar button{flex:none;font:700 14px Atkinson Hyperlegible,system-ui,sans-serif;background:#fff;color:#17202a;border:2px solid #17202a;padding:6px 14px;min-height:40px;cursor:pointer}#offbar{position:fixed;left:0;right:0;bottom:0;z-index:60;background:#f8bd00;color:#17202a;font:700 14px Atkinson Hyperlegible,system-ui,sans-serif;padding:10px 16px calc(10px + env(safe-area-inset-bottom,0px));border-top:3px solid #17202a}@media (max-width:899px){#offbar{bottom:calc(74px + env(safe-area-inset-bottom,0px));padding-bottom:10px}}@media (min-width:900px){#offbar{left:264px}}</style>
 <script>
 //---------------------------------------------------------------------
 //
@@ -2827,17 +2827,16 @@ function plExit(root,o){
     var plan=false,live=null;
     try{plan=!!(typeof S!=="undefined"&&S.plan)}catch(_){}
     try{if(typeof LIVE!=="undefined")live=LIVE}catch(_){}
-    if(live&&live.busy){step("Checking the Materials Request form");return false}
     if(!shown()){step(plan?"Laying out this Sunday":"Loading this Sunday");return false}
-    if(plan||(live&&(live.at||live.err)))return true;
+    if(plan)return true;                     /* this Sunday is on screen; the form check and saves finish behind it */
+    if(live&&live.busy){step("Checking the Materials Request form");return false}
+    if(live&&(live.at||live.err))return true;
     return Date.now()-t0>6000;               /* an older Sunday with nothing to check */
   }
   function ready(){
     if(!el("view"))return true;              /* the page was replaced by a message page (bad link and so on) */
-    if(!loaded||!fonts){step("Opening");return false}
-    if(!dataDone())return false;
-    if(inflight>0||Date.now()-lastNet<800){step("Almost ready");return false}
-    return true;
+    if((!loaded||!fonts)&&Date.now()-t0<2500){step("Opening");return false}   /* fonts get a moment so the app doesn't flash, never more */
+    return dataDone();
   }
   function go(){if(done)return;done=true;var e=el("pl-load");if(!e)return;
     setTimeout(function(){
@@ -3092,6 +3091,14 @@ ul.recent .invform{flex:1 1 100%;width:100%;min-width:0;margin:4px 0 0}
 /* targets of the jump buttons land below the top bar and the stuck buttons */
 #view .hour[id^="grp"]{scroll-margin-top:calc(var(--tb,0px) + 72px)}
 
+/* Fast start notice: shows while the copy saved on this phone is on screen */
+#freshbar{position:fixed;left:0;right:0;bottom:0;z-index:61;color:#17202a;font:700 14px/1.35 "Atkinson Hyperlegible",system-ui,sans-serif;padding:10px 16px calc(10px + env(safe-area-inset-bottom,0px));border-top:3px solid #17202a;background:#83d9df}
+#freshbar.failed{background:#ea6854}
+#freshbar.done{background:#7aca6e}
+#freshbar button{font:700 14px "Atkinson Hyperlegible",system-ui,sans-serif;background:#fff;color:#17202a;border:2px solid #17202a;padding:6px 12px;min-height:40px;margin-left:4px;cursor:pointer}
+@media (max-width:899px){#freshbar{bottom:calc(74px + env(safe-area-inset-bottom,0px));padding-bottom:10px}}
+@media (min-width:900px){#freshbar{left:264px}}
+
 </style>
 <header>
   <div class="wrap" style="padding-block:0">
@@ -3154,12 +3161,73 @@ ul.recent .invform{flex:1 1 100%;width:100%;min-width:0;margin:4px 0 0}
     if(!window.google||!google.script||!google.script.run){const keep=window.__dc&&window.__dc.keep(op,a);fetch(API,{method:"POST",body:JSON.stringify({key:KEY,op,a:a||{}})}).then(r=>{if(!r.ok)throw new Error("server "+r.status);return r.json()}).then(j=>{if(j.ok){window.__dc&&window.__dc.online();if(keep)window.__dc.put(op,a,j.data);res(j.data)}else rej({code:/not_allowed/.test(j.error)?"invalid_argument":"error",message:j.error})}).catch(async e=>{if(keep){const c=await window.__dc.get(op,a);if(c!==undefined){window.__dc.offline();res(c);return}}rej({code:"error",message:String((e&&e.message)||e)})});return}
     google.script.run.withSuccessHandler(res).withFailureHandler(e=>{const m=String((e&&e.message)||e||"error");rej({code:/not_allowed/.test(m)?"invalid_argument":"error",message:m})}).api(KEY,op,a||{});
   });
-  const me=run("whoami",{page:location.origin+location.pathname}).catch(()=>null);me.then(m=>{if(m)return;const go=()=>{document.body.innerHTML='<div style="font:17px/1.5 Atkinson Hyperlegible,system-ui,sans-serif;padding:40px 24px;max-width:520px;color:#17202a"><h2 style="font:800 30px Bricolage Grotesque,system-ui,sans-serif;margin:0 0 10px">'+(KEY?"This link isn\u2019t active":"This link is missing its key")+'</h2><p>Open the personal link Elijah sent you. If it still doesn\u2019t work, ask him for a new one.</p></div>'};if(document.body)go();else document.addEventListener("DOMContentLoaded",go)});
-  window.APP={key:KEY,run,me};
+  /* ---------- fast start ----------
+     One "boot" call brings everything the first screen needs. The last copy saved on this phone shows right away,
+     with a notice that it's checking, and the fresh copy replaces it as soon as it arrives. */
+  const PAGE=location.origin+location.pathname,SAVE_A={who:String(KEY).slice(0,6)};
+  const upSun=()=>{const d=new Date();d.setHours(0,0,0,0);d.setDate(d.getDate()+((7-d.getDay())%7));return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`};
+  const dc=()=>window.__dc&&window.__dc.get?window.__dc:null;
+  let STATIC=null,ME=null,bootRunning=false;
+  const BOOT={stale:false,at:0};window.APP_BOOT=BOOT;
+  const saveBoot=b=>{try{dc()&&dc().put("boot",SAVE_A,b)}catch(_){}};
+  const savedP=dc()?dc().get("boot",SAVE_A).catch(()=>undefined):Promise.resolve(undefined);
+  function fetchBoot(have){return run("boot",{page:PAGE,week:upSun(),have:have||""})}
+  function apply(b,first){
+    let changed=false;
+    if(!first&&ME&&b.me&&ME.admin!==b.me.admin){location.reload();return true}
+    ME=b.me;
+    (b.docs||[]).forEach(d=>{const c=cache[d.path];if(c&&c.ver===d.ver&&c.exists===d.exists)return;
+      if(first){cache[d.path]={exists:d.exists,ver:d.ver,data:d.data};return}
+      if(pending[d.path]||Date.now()-(lastWrite[d.path]||0)<=2000)return;   /* this phone's own save is on its way; its reply wins */
+      store(d);changed=true});
+    const wl=b.weeks||[];
+    if(JSON.stringify(wl)!==JSON.stringify(weeksList)){weeksList=wl;if(!first){changed=true;weeksCbs.forEach(cb=>cb({docs:weeksList.map(id=>({id,data:()=>({})}))}))}}
+    if(b.static&&(!STATIC||STATIC.v!==b.static.v)){const was=STATIC;STATIC=b.static;monthsP=null;if(was&&!first){changed=true;window.dispatchEvent(new Event("pl-static"))}}
+    return changed;
+  }
+  const keepStatic=(b,sv)=>{if(b.static&&b.static.same){if(!(sv&&sv.static&&sv.static.v===b.static.v))throw new Error("static_missing");b.static=sv.static}b.at=Date.now();return b};
+  function checkFresh(sv){
+    if(bootRunning)return;bootRunning=true;note("checking");
+    fetchBoot(sv.static&&sv.static.v).then(b=>{keepStatic(b,sv);saveBoot(b);BOOT.stale=false;BOOT.at=b.at;const ch=apply(b,false);note(ch?"updated":"same")})
+      .catch(e=>{if(/not_allowed/.test((e&&e.message)||"")){saveBoot(null);location.reload();return}note("failed")})
+      .finally(()=>{bootRunning=false});
+  }
+  const bootP=(async()=>{
+    const sv=await savedP;
+    if(sv&&sv.me&&sv.static&&sv.docs){BOOT.stale=true;BOOT.at=sv.at||0;apply(sv,true);checkFresh(sv);return sv}
+    const b=keepStatic(await fetchBoot(""),sv);saveBoot(b);BOOT.at=b.at;apply(b,true);return b;
+  })();
+  bootP.catch(()=>{});
+  BOOT.retry=()=>savedP.then(sv=>{if(sv&&sv.static)checkFresh(sv)});
+  /* the notice while the saved copy is showing */
+  function note(state){
+    let b=document.getElementById("freshbar");
+    const when=()=>{const d=new Date(BOOT.at||Date.now()),today=new Date().toDateString()===d.toDateString();
+      return (today?"":d.toLocaleDateString("en-US",{weekday:"short"})+" ")+d.toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"})};
+    if(state==="checking"||state==="failed"){
+      if(!b){b=document.createElement("div");b.id="freshbar";b.setAttribute("role","status");(document.body||document.documentElement).appendChild(b)}
+      b.className=state;clearTimeout(b._t);
+      if(state==="checking")b.textContent=`Showing the copy saved on this phone at ${when()}. Updating…`;
+      else{b.innerHTML="";const t=document.createElement("span");t.textContent=`Couldn't update. Showing the copy saved on this phone at ${when()}. Checkmarks save once it reconnects. `;
+        const r=document.createElement("button");r.type="button";r.textContent="Try again";r.onclick=()=>BOOT.retry();b.append(t,r)}
+      return}
+    if(!b)return;b.className="done";b.textContent=state==="updated"?"Updated. You're looking at the latest.":"Up to date.";
+    clearTimeout(b._t);b._t=setTimeout(()=>{const x=document.getElementById("freshbar");if(x&&x.className==="done")x.remove()},1800);
+  }
+  const me=bootP.then(()=>ME).catch(()=>run("whoami",{page:PAGE}).catch(()=>null));me.then(m=>{if(m)return;const go=()=>{document.body.innerHTML='<div style="font:17px/1.5 Atkinson Hyperlegible,system-ui,sans-serif;padding:40px 24px;max-width:520px;color:#17202a"><h2 style="font:800 30px Bricolage Grotesque,system-ui,sans-serif;margin:0 0 10px">'+(KEY?"This link isn\u2019t active":"This link is missing its key")+'</h2><p>Open the personal link Elijah sent you. If it still doesn\u2019t work, ask him for a new one.</p></div>'};if(document.body)go();else document.addEventListener("DOMContentLoaded",go)});
+  window.APP={key:KEY,run,me,boot:BOOT};
 
   /* relative file fetches (engine/*.json, pdf/*.pdf) come from the Drive folder */
   const realFetch=window.fetch?window.fetch.bind(window):null;
-  const pdfLib=()=>new Promise((res,rej)=>{let n=0;const t=setInterval(()=>{if(window.PDFLib){clearInterval(t);res(window.PDFLib)}else if(++n>200){clearInterval(t);rej(new Error("pdf tool did not load"))}},100)});
+  /* pdf-lib loads only when something needs a PDF (and quietly once the app is up), never in the way of opening */
+  let pdfP=null;
+  const pdfLib=window.__needPDF=()=>pdfP||(pdfP=new Promise((res,rej)=>{
+    if(window.PDFLib){res(window.PDFLib);return}
+    const fail=()=>{pdfP=null;rej(new Error("pdf tool did not load"))};
+    const backup=()=>window.fetch("vendor/pdf-lib.min.js").then(r=>{if(!r.ok)throw 0;return r.text()}).then(t=>{const x=document.createElement("script");x.textContent=t;document.head.appendChild(x);window.PDFLib?res(window.PDFLib):fail()}).catch(fail);
+    const s=document.createElement("script");s.src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js";
+    s.onload=()=>window.PDFLib?res(window.PDFLib):backup();s.onerror=backup;document.head.appendChild(s)}));
+  window.addEventListener("load",()=>setTimeout(()=>{const go=()=>pdfLib().catch(()=>{});window.requestIdleCallback?requestIdleCallback(go,{timeout:5000}):go()},6000));
   const bytesCache=new Map(),madeCache=new Map();
   const getBytes=p=>{if(!bytesCache.has(p))bytesCache.set(p,window.fetch(p).then(r=>{if(!r.ok){bytesCache.delete(p);throw new Error("not_found")}return r.arrayBuffer()}));return bytesCache.get(p)};
   /* Brite originals: "brite/<file>.pdf?p=3,4,5" -> just those pages, cut here in the browser */
@@ -3177,9 +3245,10 @@ ul.recent .invform{flex:1 1 100%;width:100%;min-width:0;margin:4px 0 0}
     return doc.save();
   }
   /* the curriculum and print list are the starting set plus every month file Claude has added */
-  let monthsP=null;const months=()=>monthsP||(monthsP=run("months").catch(()=>[]));window.APP.months=months;
+  let monthsP=null;const months=()=>monthsP||(monthsP=bootP.catch(()=>null).then(()=>STATIC?STATIC.months:run("months")).catch(()=>[]));window.APP.months=months;
+  let legacyP=null;const legacyMonths=()=>legacyP||(legacyP=run("months").catch(()=>{legacyP=null;return []}));   /* only used if the server is older than the boot call */
   async function merged(u,base){
-    const j=await base.json(),ms=await months();
+    const j=await base.json(),ms=await legacyMonths();
     if(/curriculum\.json$/.test(u))ms.forEach(m=>Object.assign(j,m.curriculum||{}));
     else ms.forEach(m=>{const p=m.print||{};["parts","takehome","memory_verse"].forEach(k=>j[k]=Object.assign(j[k]||{},p[k]||{}))});
     return new Response(new Blob([JSON.stringify(j)],{type:"application/json"}),{status:200});
@@ -3190,7 +3259,10 @@ ul.recent .invform{flex:1 1 100%;width:100%;min-width:0;margin:4px 0 0}
     try{
       if(/^(brite|custom)\/.+\?p=[\d,]+$/.test(u)){if(!madeCache.has(u))madeCache.set(u,britePages(u).catch(e=>{madeCache.delete(u);throw e}));return new Response(new Blob([await madeCache.get(u)],{type:"application/pdf"}),{status:200})}
       if(/^britezip\/.+\.jpe?g$/i.test(u)){if(!madeCache.has(u))madeCache.set(u,slidePage(u).catch(e=>{madeCache.delete(u);throw e}));return new Response(new Blob([await madeCache.get(u)],{type:"application/pdf"}),{status:200})}
-      if(/^engine\/(curriculum|print_index)\.json$/.test(u)&&!(opts&&opts.raw))return merged(u,await window.fetch(u,{raw:true}));
+      if(/^engine\/(curriculum|print_index)\.json$/.test(u)&&!(opts&&opts.raw)){
+        await bootP.catch(()=>null);
+        if(STATIC)return new Response(new Blob([JSON.stringify(/curriculum/.test(u)?STATIC.cur:STATIC.pi)],{type:"application/json"}),{status:200});
+        return merged(u,await window.fetch(u,{raw:true}));}
     }catch(e){return new Response("",{status:404})}
     try{
       /* big files come over in pieces; each piece is retried a few times */
@@ -3262,7 +3334,7 @@ ul.recent .invform{flex:1 1 100%;width:100%;min-width:0;margin:4px 0 0}
   let logRows=null;
   const db={
     doc(path){return {
-      async get(){if(!cache[path])store(await run("get",{path}));return snap(path)},
+      async get(){await bootP.catch(()=>null);if(!cache[path])store(await run("get",{path}));return snap(path)},
       async set(data){
         if(/^audit\//.test(path))return;              /* the log is written row by row on the server */
         /* send only what this screen changed, so other people's changes are kept */
@@ -3273,8 +3345,9 @@ ul.recent .invform{flex:1 1 100%;width:100%;min-width:0;margin:4px 0 0}
       },
       onSnapshot(cb,err){
         (listeners[path]||(listeners[path]=new Set())).add(cb);startPolling();
-        if(cache[path])setTimeout(()=>cb(snap(path)),0);
-        else run("get",{path}).then(store).catch(e=>err&&err(e));
+        bootP.catch(()=>null).then(()=>{
+          if(cache[path])cb(snap(path));
+          else run("get",{path}).then(store).catch(e=>err&&err(e))});
         return ()=>listeners[path].delete(cb);
       }}},
     collection(path){const q={
@@ -3290,7 +3363,7 @@ ul.recent .invform{flex:1 1 100%;width:100%;min-width:0;margin:4px 0 0}
       onSnapshot(cb){
         if(path!=="weeks")return ()=>{};
         weeksCbs.add(cb);startPolling();
-        run("list",{prefix:"weeks/"}).then(l=>{weeksList=l;cb({docs:l.map(id=>({id,data:()=>({})}))})}).catch(()=>cb({docs:[]}));
+        bootP.then(()=>cb({docs:weeksList.map(id=>({id,data:()=>({})}))}),()=>run("list",{prefix:"weeks/"}).then(l=>{weeksList=l;cb({docs:l.map(id=>({id,data:()=>({})}))})}).catch(()=>cb({docs:[]})));
         return ()=>weeksCbs.delete(cb);
       }};return q}
   };
@@ -3319,12 +3392,12 @@ ul.recent .invform{flex:1 1 100%;width:100%;min-width:0;margin:4px 0 0}
     return {status:"saved"};
   }};
 
-  window.claude={use:async n=>{await me;return ({db,user,mcp,downloads})[n]||null}};
+  /* a link that isn't active gets the message page and nothing else runs behind it */
+  window.claude={use:async n=>{if(!(await me))return new Promise(()=>{});return ({db,user,mcp,downloads})[n]||null}};
 })();
 
 </script>
-<script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
-<script>if(!window.PDFLib)fetch("vendor/pdf-lib.min.js").then(r=>r.text()).then(t=>{const x=document.createElement("script");x.textContent=t;document.head.appendChild(x)})</script>
+
 <script>
 /* Room packets: one printable PDF per room (plus a cardstock packet when a room needs one).
    planPackets(room, jobs) -> {plain:{segments,twoSided}, card:{segments,twoSided}|null, missing:[...]}
@@ -3908,7 +3981,7 @@ async function makePackets(list,kind){
 }
 async function savePacket(btn,list,kind,name){
   if(!DL){toast("Downloads aren't available in this view.");return}
-  if(!window.PDFLib){toast("The PDF builder didn't load. Refresh the page.");return}
+  try{await window.__needPDF()}catch(_){toast("The PDF builder didn't load. Check the connection and try again.");return}
   const label=btn.textContent;btn.disabled=true;btn.textContent="Building…";
   try{const bytes=await makePackets(list,kind);
     await DL.save({filename:name,data:new Blob([bytes],{type:"application/pdf"})});
@@ -4823,7 +4896,7 @@ $("#chatClear").onclick=()=>{CHAT.ctl?.abort();CHAT.turns=[];saveChat();drawChat
   (function(){const nav=document.getElementById("tabs");if(!nav)return;
     const groups=[["home","This Sunday"],["closets","Supplies"],["log","Admin"]];
     groups.forEach(([t,label])=>{const b=nav.querySelector(`button[data-t="${t}"]`);if(b&&!b.previousElementSibling?.classList?.contains("navgroup"))b.insertAdjacentHTML("beforebegin",`<span class="navgroup" data-g="${t}">${label}</span>`)});
-    const fix=()=>{nav.querySelectorAll(".navgroup").forEach(g=>{let n=g.nextElementSibling,any=false;while(n&&!n.classList.contains("navgroup")){if(n.matches("button[data-t]")&&!n.hidden)any=true;n=n.nextElementSibling}g.hidden=!any})};
+    const fix=()=>{nav.querySelectorAll(".navgroup").forEach(g=>{let n=g.nextElementSibling,any=false;while(n&&!n.classList.contains("navgroup")){if(n.matches("button[data-t]")&&!n.hidden)any=true;n=n.nextElementSibling}if(g.hidden!==!any)g.hidden=!any})};   /* only touch it when it changes, or this watcher sets itself off forever */
     fix();new MutationObserver(fix).observe(nav,{subtree:true,attributes:true,attributeFilter:["hidden"]});
   })();
 
@@ -4860,6 +4933,9 @@ $("#chatClear").onclick=()=>{CHAT.ctl?.abort();CHAT.turns=[];saveChat();drawChat
     if(pct!==100){document.documentElement.style.webkitTextSizeAdjust=pct+"%";document.documentElement.style.textSizeAdjust=pct+"%";document.documentElement.dataset.textsize=pct}
   }catch(_){}})();
 })();
+
+/* Fast start: when the curriculum changes on the server while the app is open (a new month was built), use it right away */
+window.addEventListener("pl-static",()=>{LIVE.cur=null;LIVE.pi=null;ensureCur().then(()=>{fillWeeks();render()})});
 
 </script>
 
