@@ -2916,7 +2916,7 @@ ul.months{margin:0;padding-left:18px}ul.months .btn{padding:3px 10px;font-size:1
   /* R2: on checklist rows the label sits on the same line as its value, with room to breathe */
   table.cklist td[data-label]::before{content:attr(data-label);display:inline-block;margin-right:8px;font:700 11px var(--body);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);vertical-align:1px}
   table.stack td:first-child{font-size:17px}
-  .jump{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0 4px;position:sticky;top:var(--tb,0px);z-index:6;background:var(--paper);padding:8px 0;box-shadow:0 0 0 100vmax var(--paper);clip-path:inset(0 -100vmax)}
+  .jump{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0 4px;position:sticky;top:var(--tb,0px);z-index:6;background:var(--paper);padding:8px 0;box-shadow:0 0 0 100vmax var(--paper);clip-path:inset(0 -100vmax);transition:top .28s cubic-bezier(.3,0,.2,1)}
   .jump::after{content:"";position:absolute;left:-100vmax;right:-100vmax;bottom:0;height:2px;background:var(--ink);opacity:0;transition:opacity .15s}
   .jump.stuck::after{opacity:1}
   .jump a{font:700 14px var(--body);color:var(--ink);text-decoration:none;border:2px solid var(--rule);background:var(--surface);padding:8px 12px}
@@ -2970,7 +2970,7 @@ nav#tabs .navgroup{display:none}
 }
 @keyframes ptr-run{0%,100%{opacity:1}50%{opacity:.25}}
 @media (max-width:899px) and (pointer:coarse){#liveRefresh{display:none}}
-@media (prefers-reduced-motion:reduce){.topbar,nav#tabs button{transition:none!important}}
+@media (prefers-reduced-motion:reduce){.topbar,nav#tabs button,.jump,#view > .prog{transition:none!important}}
 
 /* ---------- P: phone in one hand ---------- */
 /* P1: bigger tap targets everywhere, without growing the look */
@@ -4737,10 +4737,15 @@ $("#chatClear").onclick=()=>{CHAT.ctl?.abort();CHAT.turns=[];saveChat();drawChat
   });
   document.addEventListener("keydown",e=>{if((e.key==="Enter"||e.key===" ")&&e.target.matches("#view.clofold > .closet")){e.preventDefault();e.target.click()}});
   // P6: the progress bar sticks just under whatever is showing at the top
-  (function(){let t=false;const set=()=>{t=false;const tb=document.querySelector(".topbar");const b=tb&&getComputedStyle(tb).display!=="none"?Math.max(0,tb.getBoundingClientRect().bottom):0;document.documentElement.style.setProperty("--tb",b+"px");document.querySelectorAll("#view .jump").forEach(j=>j.classList.toggle("stuck",j.getBoundingClientRect().top<=b+1&&scrollY>0))};
-    const go=()=>{if(!t){t=true;requestAnimationFrame(set)}};addEventListener("scroll",go,{passive:true});addEventListener("resize",go);document.addEventListener("transitionend",e=>{if(e.target.classList&&e.target.classList.contains("topbar"))go()});
-    // follow the top bar as it slides in or out, not just when the slide finishes
-    new MutationObserver(()=>{const t0=performance.now();const f=()=>{set();if(performance.now()-t0<340)requestAnimationFrame(f)};requestAnimationFrame(f)}).observe(document.documentElement,{attributes:true,attributeFilter:["class"]});setTimeout(set,500)})();
+  // The bars below it move on the same clock as the logo row: when the logo row starts to slide, --tb jumps straight to where it will end up
+  // and CSS eases top with the same duration and curve as the logo row, so the two move together instead of one chasing the other.
+  (function(){let t=false;const root=document.documentElement;let lastTb=null;
+    const target=()=>{const tb=document.querySelector(".topbar");if(!tb||getComputedStyle(tb).display==="none")return 0;
+      return root.classList.contains("bars-away")?(parseFloat(getComputedStyle(tb).paddingTop)||0):tb.offsetHeight};
+    const set=()=>{t=false;const b=target();if(b!==lastTb){lastTb=b;root.style.setProperty("--tb",b+"px")}
+      document.querySelectorAll("#view .jump").forEach(j=>j.classList.toggle("stuck",scrollY>0&&j.getBoundingClientRect().top<=parseFloat(getComputedStyle(j).top)+1))};
+    const go=()=>{if(!t){t=true;requestAnimationFrame(set)}};addEventListener("scroll",go,{passive:true});addEventListener("resize",go);
+    new MutationObserver(set).observe(root,{attributes:true,attributeFilter:["class"]});setTimeout(set,0);setTimeout(set,500)})();
   document.addEventListener("click",e=>{const j=e.target.closest("[data-jump]");if(j){e.preventDefault();const t=document.getElementById(j.dataset.jump);if(!t)return;
     // going down hides the top bar, going up brings it back, so leave room for whichever will be showing
     const bar=j.closest(".jump"),r=t.getBoundingClientRect(),tb=document.querySelector(".topbar"),tbH=tb&&getComputedStyle(tb).display!=="none"?tb.offsetHeight:0,down=r.top>0;
@@ -4796,6 +4801,8 @@ $("#chatClear").onclick=()=>{CHAT.ctl?.abort();CHAT.turns=[];saveChat();drawChat
       if(Math.sign(d)!==Math.sign(acc))acc=0;acc+=d;
       if(acc>24)set(true);else if(acc<-16)set(false)})},{passive:true});
     document.addEventListener("click",e=>{if(e.target.closest("#tabs button, .topbar"))set(false)});
+    // a tab tap always opens that screen at the top
+    document.addEventListener("click",e=>{if(!e.target.closest("#tabs button"))return;const up=()=>scrollTo({top:0,left:0,behavior:"instant"});up();requestAnimationFrame(()=>{up();requestAnimationFrame(up)})});
   })();
 
   /* N2: pull down to refresh on phones; the Refresh button stays on laptops */
