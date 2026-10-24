@@ -3044,10 +3044,48 @@ table.cklist tr.tap:active{background:#efe8da}
 .ck:focus-visible{outline:3px solid var(--navy);outline-offset:2px}
 @keyframes ck-draw{from{transform:translateY(-12%) rotate(45deg) scale(.3);opacity:.2}to{transform:translateY(-12%) rotate(45deg) scale(1);opacity:1}}
 .sweep{position:relative;overflow:hidden}
-.sweep::before{content:"";position:absolute;left:0;right:0;top:0;height:6px;z-index:2;background:linear-gradient(90deg,#006cb4 0 20%,#ea6854 20% 40%,#f8bd00 40% 60%,#7aca6e 60% 80%,#83d9df 80% 100%);transform-origin:0 50%;animation:sweep .7s cubic-bezier(.3,0,.2,1) forwards}
+.sweep::before{content:"";position:absolute;left:0;right:0;top:0;height:6px;z-index:2;background:linear-gradient(90deg,#006cb4 0 20%,#ea6854 20% 40%,#f8bd00 40% 60%,#7aca6e 60% 80%,#83d9df 80% 100%);transform-origin:0 50%;animation:sweep .7s cubic-bezier(.3,0,.2,1) var(--sd,0ms) forwards}
 @keyframes sweep{0%{transform:scaleX(0)}55%{transform:scaleX(1);opacity:1}100%{transform:scaleX(1);opacity:0}}
 @media (prefers-reduced-motion:reduce){.ck.just:checked::after{animation:none}.sweep::before{display:none}}
 @media (min-width:900px){.fsum,.binbar{display:none!important}}
+
+/* ---------- fixes from Elijah's phone (Oct 23) ---------- */
+/* Teacher requests: the request gets its own line under the room, so the two never overlap */
+@media (max-width:899px){
+  .tablewrap table.pulltbl.ck3 td:nth-child(3),.tablewrap table.cklist.ck3 td:nth-child(3){grid-column:2/-1;padding-top:0}
+}
+/* Pull: Update sits on its own line with room above it */
+td .btn.upd{display:flex;margin-top:12px}
+td .acts{margin-top:10px;display:flex;flex-wrap:wrap;gap:8px}
+td .acts[hidden]{display:none}
+/* Print: the room line on each packet card is a tap target */
+.card > .pkhead{cursor:pointer;min-height:44px;align-items:center!important;margin:-6px -6px 4px;padding:6px}
+.card > .pkhead:active{background:#efe8da}
+/* Closet map: search and Add an item side by side, the edit form, recently changed */
+.invtop{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}
+.invtop #find{flex:1 1 220px;min-height:44px;max-width:420px}
+.invtop .btn{min-height:44px}
+.invform{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(180px,100%),1fr));gap:10px 12px;box-sizing:border-box;min-width:0;background:var(--surface);border:3px solid var(--rule);padding:12px 14px;margin:8px 0 14px;max-width:820px}
+.invform label{display:flex;flex-direction:column;gap:4px;font:700 12px var(--body);letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
+.invform input,.invform select{font:400 16px var(--body);color:var(--ink);text-transform:none;letter-spacing:0;min-height:44px;padding:6px 10px;border:2px solid var(--rule);background:var(--surface);box-sizing:border-box;width:100%}
+.invform .wide{grid-column:1/-1}
+.invacts{grid-column:1/-1;display:flex;gap:8px;flex-wrap:wrap}
+.invacts .btn{min-height:44px}
+tr.invedit td{padding:0 8px 8px!important;display:block!important;min-width:0}
+tr.invedit td::before{display:none!important}
+#view[data-tab="closets"] table.stack tr.invedit{padding:0 4px 8px}
+td .btn.edit{min-height:36px;padding:4px 12px;margin-left:6px}
+ul.recent{list-style:none;margin:0;padding:0;max-width:820px;border:3px solid var(--rule);background:var(--surface)}
+ul.recent li{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;padding:10px 14px;border-bottom:1px dashed #b9b1a2}
+ul.recent li:last-child{border-bottom:0}
+ul.recent .rinfo{flex:1 1 200px;min-width:0}
+ul.recent .btn{min-height:44px}
+ul.recent .invform{flex:1 1 100%;width:100%;min-width:0;margin:4px 0 0}
+@media (max-width:899px){
+  td .btn.edit{min-height:44px;margin:6px 0 0}
+  #view[data-tab="closets"] table.stack td:last-child{flex-wrap:wrap}
+}
+@media (max-width:899px){ .invform{grid-template-columns:minmax(0,1fr);max-width:100%} .invform input,.invform select{min-width:0} }
 
 </style>
 <header>
@@ -3736,18 +3774,55 @@ function render(){
   if(!S.plan||!(S.plan.rooms||[]).length){v.innerHTML=`<div class="empty">No pull list yet for this Sunday. It fills in as soon as teachers answer the Materials Request form.<div style="margin-top:10px"><button class="btn primary" data-goto="preview">See what teachers can pick</button></div></div>`;return}
   (({preview:rPreview,count:rCount,print:rPrint,pull:rPull,arrange:rArrange,order:rOrder,closets:rClosets})[S.tab]||(()=>{if(!(window.__route&&window.__route()))rPreview()}))();
 }
+/* Closet map: search, fold by closet (phones), edit any item, add new ones, and fix recent changes */
+const INV_STATUS=[["have","Have"],["low","Running low"],["out","Out"],["check","Confirm"],["not_seen","Not in a closet"]];
+const invTag=st=>st==="have"?'<span class="flag ok">Have</span>':st==="check"?'<span class="flag warn">Confirm</span>':st==="low"?'<span class="flag warn">Low</span>':'<span class="flag bad">'+(st==="out"?"Out":"Not in a closet")+'</span>';
+const invKey=n=>{let k=String(n||"").toLowerCase().replace(/[^a-z0-9' -]/g," ").replace(/\s+/g," ").trim();if(/[^s]s$/.test(k)&&!/(ss|us)$/.test(k))k=k.slice(0,-1);return k};
+function invForm(key){
+  const isNew=key==="__new",v=isNew?{status:"have"}:(S.inv.items||{})[key]||{};
+  return `<div class="invform" data-invform="${esc(key)}">
+    <label>Item<input type="text" id="ie-name" value="${esc(isNew?"":cap(v.label||""))}" placeholder="Ex: Glue dots" autocomplete="off"></label>
+    <label>Closet<select id="ie-closet">${[...CLOSETS,"Other",""].map(c=>`<option value="${esc(c)}" ${(v.closet||"")===c?"selected":""}>${c?esc(c):"Not in a closet"}</option>`).join("")}</select></label>
+    <label>Where<input type="text" id="ie-spot" value="${esc(v.spot||"")}" placeholder="Shelf, bin or drawer"></label>
+    <label>Status<select id="ie-status">${INV_STATUS.map(([k,t])=>`<option value="${k}" ${(v.status||"have")===k?"selected":""}>${t}</option>`).join("")}</select></label>
+    <label class="wide">Note<input type="text" id="ie-note" value="${esc(v.note||"")}" placeholder="Optional"></label>
+    <div class="invacts"><button type="button" class="btn primary" data-invsave="${esc(key)}">${isNew?"Add item":"Save"}</button><button type="button" class="btn" data-invcancel>Cancel</button></div>
+  </div>`;
+}
 function rClosets(){
-  const q=(S.find||"").toLowerCase().trim();
+  const q=(S.find||"").toLowerCase().trim(),ed=S.invEdit||null;
   const all=Object.entries(S.inv.items||{}).map(([k,v])=>({k,...v})).filter(v=>!q||(v.label+" "+v.spot+" "+v.note+" "+v.closet).toLowerCase().includes(q));
   const by={};all.forEach(v=>{(by[v.closet||"Not in any closet"] ||= []).push(v)});
   let h=`<h2>Closet map</h2><p class="sub">Everything the lessons use and where it lives.</p>
-  <div class="inline-form" style="margin-bottom:10px"><input type="text" id="find" placeholder="Search (ex: balloons, glue, cones)" value="${esc(S.find||"")}" style="width:min(100%,360px)" aria-label="Search the closets"></div>`;
+  <div class="inline-form invtop"><input type="text" id="find" placeholder="Search (ex: balloons, glue, cones)" value="${esc(S.find||"")}" aria-label="Search the closets"><button type="button" class="btn" data-invedit="__new">Add an item</button></div>
+  ${ed==="__new"?invForm("__new"):""}`;
+  const row=v=>`<tr data-invrow="${esc(v.k)}"><td><b>${esc(cap(v.label))}</b></td><td><div>${esc(v.spot||"")}${v.note?`<div class="small">${esc(v.note)}</div>`:""}</div></td><td>${invTag(v.status)} <button type="button" class="btn edit" data-invedit="${esc(v.k)}" aria-label="Edit ${esc(v.label)}">Edit</button></td></tr>${ed===v.k&&!S.invEditRecent?`<tr class="invedit"><td colspan="3">${invForm(v.k)}</td></tr>`:""}`;
   for(const c of [...CLOSETS,"Other","Not in any closet"]){const list=by[c];if(!list)continue;list.sort((a,b)=>a.label.localeCompare(b.label));
-    h+=`<div class="closet">${esc(c)} <span class="count">${list.length} item${list.length>1?"s":""}</span></div><div class="tablewrap"><table><thead><tr><th>Item</th><th>Where</th><th>Status</th></tr></thead><tbody>${list.map(v=>`<tr><td><b>${esc(cap(v.label))}</b></td><td>${esc(v.spot||"")}${v.note?`<div class="small">${esc(v.note)}</div>`:""}</td><td>${v.status==="have"?'<span class="flag ok">Have</span>':v.status==="check"?'<span class="flag warn">Confirm</span>':v.status==="low"?'<span class="flag warn">Low</span>':'<span class="flag bad">'+(v.status==="out"?"Out":"Not in a closet")+'</span>'}</td></tr>`).join("")}</tbody></table></div>`;}
-  if(!all.length)h+=`<div class="empty">${q?"Nothing matches that search.":"The inventory is empty."}</div>`;
+    h+=`<div class="closet">${esc(c)} <span class="count">${list.length} item${list.length>1?"s":""}</span></div><div class="tablewrap"><table><thead><tr><th>Item</th><th>Where</th><th>Status</th></tr></thead><tbody>${list.map(row).join("")}</tbody></table></div>`;}
+  if(!all.length)h+=`<div class="empty">${q?"Nothing matches that search. Tap Add an item to add it.":"The inventory is empty."}</div>`;
+  /* recently changed: the easy way to undo a mistaken "Running low" or "Can't find it" */
+  const seed=S.inv.updated||"";
+  const recent=Object.entries(S.inv.items||{}).map(([k,v])=>({k,...v})).filter(v=>v.updated&&v.updated!==seed).sort((a,b)=>a.updated<b.updated?1:-1).slice(0,8);
+  h+=`<h3 class="subhead">Recently changed</h3>${recent.length?`<ul class="recent">${recent.map(v=>`<li><div class="rinfo"><b>${esc(cap(v.label))}</b> ${invTag(v.status)}<div class="small">${esc(v.closet||"No closet")}${v.spot?" · "+esc(v.spot):""} · ${esc(new Date(v.updated).toLocaleString("en-US",{weekday:"short",hour:"numeric",minute:"2-digit"}))}</div></div><button type="button" class="btn" data-invedit="${esc(v.k)}" data-inrecent="1">Edit</button>${ed===v.k&&S.invEditRecent?invForm(v.k):""}</li>`).join("")}</ul>`:`<p class="small">Changes people make here or on Pull show up here, so a wrong tap is easy to fix.</p>`}`;
+  /* keep what someone is typing if the list redraws while the form is open (another person saved a change) */
+  const keep={};if(ed)["ie-name","ie-closet","ie-spot","ie-status","ie-note"].forEach(i=>{const x=document.getElementById(i);if(x&&document.querySelector(`.invform[data-invform="${CSS.escape(ed)}"]`))keep[i]=x.value});
   $("#view").innerHTML=h;
-  const f=$("#find");if(f&&q){f.focus();f.setSelectionRange(f.value.length,f.value.length)}
+  for(const i in keep){const x=document.getElementById(i);if(x)x.value=keep[i]}
+  const f=$("#find");if(f&&q&&!ed){f.focus();f.setSelectionRange(f.value.length,f.value.length)}
+  const n=$("#ie-name");if(n&&ed==="__new")n.focus();
 }
+document.addEventListener("click",e=>{
+  const b=e.target.closest("button[data-invedit],button[data-invsave],button[data-invcancel]");if(!b||S.tab!=="closets")return;
+  if(b.dataset.invedit!==undefined){const k=b.dataset.invedit,rec=!!b.dataset.inrecent;S.invEdit=(S.invEdit===k&&S.invEditRecent===rec)?null:k;S.invEditRecent=rec;rClosets();
+    const fm=document.querySelector(".invform");if(fm)fm.scrollIntoView({block:"nearest",behavior:"smooth"});return}
+  if(b.dataset.invcancel!==undefined){S.invEdit=null;rClosets();return}
+  const k=b.dataset.invsave,name=($("#ie-name").value||"").trim();
+  if(!name){toast("Type the item's name first.");$("#ie-name").focus();return}
+  const closet=$("#ie-closet").value,status=$("#ie-status").value;
+  const fields={closet:status==="not_seen"?"":closet,spot:$("#ie-spot").value.trim(),status,note:$("#ie-note").value.trim(),from:"closet map"};
+  let key=k;if(k==="__new"){key=invKey(name);if(!key){toast("Type the item's name first.");return}if((S.inv.items||{})[key])toast(`${cap(name)} was already in the inventory. Updated it.`)}
+  S.invEdit=null;setInv(key,name,fields);
+});
 document.addEventListener("input",e=>{if(e.target.id==="find"){S.find=e.target.value;clearTimeout(rClosets.t);rClosets.t=setTimeout(rClosets,200)}});
 const ck=(id,label)=>`<input type="checkbox" class="ck" data-ck="${esc(id)}" ${S.prog.checks?.[id]?"checked":""} aria-label="${esc(label)}">`;
 
@@ -3944,7 +4019,7 @@ function rPull(){
       const where=inv?`${inv.spot?esc(inv.spot):""}${statusFlag(inv.status)}${inv.note?`<div class="small">${esc(inv.note)}</div>`:""}`:'<span class="small">Not in inventory yet</span>';
       return `<tr class="${S.prog.checks?.[id]?"done":""}"><td>${ck(id,"Pulled "+i.label)}</td><td><b>${esc(cap(i.label))}</b>${[...i.notes].map(n=>` <span class="small">(${esc(n)})</span>`).join("")}<div class="rooms">${esc(i.rooms.join(" · "))}</div></td>
       <td class="q">${i.total}${i.unknown?' + <span class="flag bad">?</span>':""}</td>
-      <td>${where}<div class="acts"><button class="btn" data-found="${esc(i.key)}" data-label="${esc(i.label)}">Found it in…</button><button class="btn" data-mark="low" data-key="${esc(i.key)}" data-label="${esc(i.label)}">Running low</button><button class="btn" data-mark="out" data-key="${esc(i.key)}" data-label="${esc(i.label)}">Can't find it</button></div>
+      <td>${where}<div class="acts">${inv&&inv.closet&&inv.status!=="have"?`<button class="btn" data-mark="have" data-key="${esc(i.key)}" data-label="${esc(i.label)}">We have it</button>`:""}<button class="btn" data-found="${esc(i.key)}" data-label="${esc(i.label)}">Found it in…</button><button class="btn" data-mark="low" data-key="${esc(i.key)}" data-label="${esc(i.label)}">Running low</button><button class="btn" data-mark="out" data-key="${esc(i.key)}" data-label="${esc(i.label)}">Can't find it</button></div>
       <div class="inline-form" id="f-${esc(i.key)}" hidden><select id="fc-${esc(i.key)}" aria-label="Closet">${CLOSETS.map(c=>`<option ${inv?.closet===c?"selected":""}>${c}</option>`).join("")}<option>Other</option></select><input type="text" id="fs-${esc(i.key)}" placeholder="Shelf or bin (ex: top shelf, left)" value="${esc(inv?.spot||"")}"><button class="btn primary" data-save="${esc(i.key)}" data-label="${esc(i.label)}">Save</button></div></td></tr>`}).join("")+`</tbody></table></div>`;
   }
   $("#view").innerHTML=h;
@@ -4555,7 +4630,7 @@ $("#chatClear").onclick=()=>{CHAT.ctl?.abort();CHAT.turns=[];saveChat();drawChat
     pull:"Items are grouped by closet. Check each one off as you pull it. If it isn't where the page says, tap Update, then Found it in… or Can't find it. That's how the inventory learns. Tap anywhere on a row to check it off. The rooms line shows how many each room gets.",
     arrange:"Check off each thing as it goes in the bin. When everything is checked, the bin turns green on its own.",
     order:"Links open an Amazon search. Nothing is ordered automatically. Food items are a grocery run. Teacher requests and rooms that haven't turned in the form are further down.",
-    closets:"Search any item to see its closet and shelf. Yellow “Confirm” means it wasn't clear in the photos: check it once and tap Found it in… so it turns green. The map updates every time someone taps Found it in… or Can't find it."
+    closets:"Search any item to see its closet and shelf. Tap Edit to change where it lives or mark it Have, Running low or Out. Add an item puts something new on the map. If someone tapped the wrong thing on Pull, it shows under Recently changed at the bottom so you can fix it."
   };
   const OPEN_NOW={};   /* a first-time tip stays open through re-draws until the person leaves that tab */
   function tips(v){
@@ -4600,6 +4675,10 @@ $("#chatClear").onclick=()=>{CHAT.ctl?.abort();CHAT.turns=[];saveChat();drawChat
     // P1: any other lone checkbox gets a 44 by 44 tap area around it
     v.querySelectorAll("input[type=checkbox]").forEach(c=>{if(c.closest("label")||c.closest("tr.tap"))return;
       const l=document.createElement("label");l.className="ckhit";c.replaceWith(l);l.appendChild(c)});
+    // Print packets: the whole room line on each card checks it off, like the rows on Pull (Save packet keeps its own job)
+    if(tab==="print")v.querySelectorAll(".card > div:first-child").forEach(d=>{if(d.querySelector(".ck"))d.classList.add("pkhead")});
+    // a three-column checklist (Teacher requests): the text gets its own line under the room so nothing overlaps
+    v.querySelectorAll("table.cklist").forEach(t=>{if(t.querySelectorAll("thead th").length===3)t.classList.add("ck3")});
     // P3: one Update button per Pull item instead of three
     if(tab==="pull")v.querySelectorAll("td .acts:not([data-one])").forEach(a=>{a.dataset.one="1";a.hidden=true;
       a.insertAdjacentHTML("beforebegin",`<button type="button" class="btn upd" aria-expanded="false">Update</button>`)});
@@ -4644,6 +4723,8 @@ $("#chatClear").onclick=()=>{CHAT.ctl?.abort();CHAT.turns=[];saveChat();drawChat
     // P1 row tap: anywhere on a checklist row except its own buttons, links and fields
     const tr=e.target.closest("table.cklist tr.tap");
     if(tr&&!e.target.closest("button,a,input,select,textarea,label,.inline-form")){const c=tr.querySelector("td:first-child .ck");if(c){c.click();return}}
+    const ph=e.target.closest(".card > .pkhead");
+    if(ph&&!e.target.closest("button,a,input,select,textarea,label")){const c=ph.querySelector(".ck");if(c){c.click();return}}
     const u=e.target.closest("button.upd");if(u){const a=u.nextElementSibling;if(a&&a.classList.contains("acts")){a.hidden=!a.hidden;u.setAttribute("aria-expanded",String(!a.hidden));u.textContent=a.hidden?"Update":"Close"}return}
     const f=e.target.closest("button.fsum");if(f){const k=f.dataset.bin;BIN.all=false;BIN.open=BIN.open===k?"":k;foldBins($1("#view"));return}
     const all=e.target.closest("button[data-binall]");if(all){BIN.all=!BIN.all;all.textContent=BIN.all?"Fold up":"Open all";foldBins($1("#view"));return}
@@ -4740,10 +4821,14 @@ $("#chatClear").onclick=()=>{CHAT.ctl?.abort();CHAT.turns=[];saveChat();drawChat
     if(calm())return;
     // a closet group on Pull is finished: every row in its table checked
     if(S.tab==="pull")v.querySelectorAll(":scope > .closet").forEach(h=>{const t=h.nextElementSibling,cks=t?[...t.querySelectorAll(".ck")]:[];const k="pull|"+(h.firstChild?h.firstChild.textContent.trim():"");
-      const done=cks.length>0&&cks.every(x=>x.checked),was=groupsDone.get(k);groupsDone.set(k,done);if(done&&was===false)sweep(h)});
-    if(S.tab==="arrange")v.querySelectorAll(".grid > .card").forEach(c=>{const ck=c.querySelector(".binrow .ck");if(!ck)return;const k=ck.dataset.ck,done=c.classList.contains("ready"),was=groupsDone.get(k);groupsDone.set(k,done);if(done&&was===false)sweep(c)});
+      const done=cks.length>0&&cks.every(x=>x.checked),was=groupsDone.get(k);groupsDone.set(k,done);if(done&&was===false)sweep(h,k);else if(done)keepSweep(h,k)});
+    if(S.tab==="arrange")v.querySelectorAll(".grid > .card").forEach(c=>{const ck=c.querySelector(".binrow .ck");if(!ck)return;const k=ck.dataset.ck,done=c.classList.contains("ready"),was=groupsDone.get(k);groupsDone.set(k,done);if(done&&was===false)sweep(c,k);else if(done)keepSweep(c,k)});
   }
-  function sweep(el){el.classList.remove("sweep");void el.offsetWidth;el.classList.add("sweep");setTimeout(()=>el.classList.remove("sweep"),900)}
+  // a redraw (like the save reply) can replace the header mid-sweep, so remember when each sweep started and keep it going on the new element
+  const sweeping=new Map();
+  function sweep(el,k){el.classList.remove("sweep");void el.offsetWidth;el.style.removeProperty("--sd");el.classList.add("sweep");if(k)sweeping.set(k,Date.now());setTimeout(()=>el.classList.remove("sweep"),900)}
+  function keepSweep(el,k){const t=sweeping.get(k);if(!t)return;const gone=Date.now()-t;if(gone>=700){sweeping.delete(k);return}
+    if(el.classList.contains("sweep"))return;el.style.setProperty("--sd",-gone+"ms");el.classList.add("sweep");setTimeout(()=>el.classList.remove("sweep"),900-gone)}
   // M2: switching tabs fades the new screen in
   let lastTab=null;
   function fadeIn(v){if(S.tab===lastTab)return;const first=lastTab===null;lastTab=S.tab;if(first||calm()||!v.animate)return;
