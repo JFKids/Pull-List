@@ -3099,6 +3099,12 @@ ul.recent .invform{flex:1 1 100%;width:100%;min-width:0;margin:4px 0 0}
 @media (max-width:899px){#freshbar{bottom:calc(74px + env(safe-area-inset-bottom,0px));padding-bottom:10px}}
 @media (min-width:900px){#freshbar{left:264px}}
 
+/* Take-home pages printed in bulk, at the top of Print */
+section.bulk{margin:4px 0 22px}
+section.bulk h3{margin:0 0 4px}
+section.bulk .tablewrap{margin-top:8px}
+section.bulk td .acts{margin-top:8px}
+
 </style>
 <header>
   <div class="wrap" style="padding-block:0">
@@ -3605,7 +3611,7 @@ function buildWeek(csvText,cur,PI,sunday,now){
   const week=cur[sunday]||{sunday,title:'(curriculum not loaded)',groups:{}};
   const [Y,M,D]=sunday.split('-').map(Number);const sun=new Date(Y,M-1,D);
   const cutoff=new Date(Y,M-1,D-4,12,0,0);const windowStart=addDays(cutoff,-7);
-  const actIndex=w=>{const idx={};for(const G of ['Older','Younger','Large Group'])for(const a of (w.groups[G]?.activities||[]))idx[norm(a.name)]=[G,a];return idx};
+  const actIndex=w=>{const idx={};for(const G of ['Older','Younger','Large Group'])for(const a of (w.groups[G]?.activities||[])){idx[norm(a.name)]=[G,a];for(const k of (a.aka||[]))if(!idx[norm(k)])idx[norm(k)]=[G,a]}return idx};   // aka: an old name the form may still use
   const thisIdx=actIndex(week);const allIdx={};for(const [d,w] of Object.entries(cur))allIdx[d]=actIndex(w);
   const match=(name,idx)=>{const n=norm(name);if(idx[n])return idx[n];let best=null,bs=-1;
     for(const k of Object.keys(idx)){const r=ratio(n,k);if(r>bs){bs=r;best=k}}return best!==null&&bs>=0.78?idx[best]:null};
@@ -3757,16 +3763,54 @@ function printJobs(){
       jobs.push({key:p.id,actKey:`${p.group}|${p.activity}`,id:`print|${p.id}`,room:r,activity:p.activity,what:p.what,pdf:p.pdf,pdfPages:p.pdf_pages,from,to,partPages:pp,copies:c.copies,pick:c.pick,
         sheets:c.copies==null?null:(c.pick??pp*c.copies)/(p.duplex?2:1),paper:p.paper,duplex:p.duplex,cut:p.cut,note:p.note,group:p.group});
     }
-    /* every room gets the double-sided take-home every week, whatever activities they picked */
-    {const g=r.group==="Younger"?"Younger":"Older",t=P.takehome?.[g];
-      if(t)jobs.push({key:"takehome|"+g,actKey:"takehome|"+g,id:"print|takehome|"+g,room:r,activity:"Take-Home",what:`${g} Elementary take-home (front + Going Deeper back)`,pdf:t.pdf,pdfPages:2,from:1,to:2,partPages:2,copies:n,pick:null,sheets:n,paper:"plain",duplex:true,cut:false,note:"1 per kid",group:g});
-      /* the Take-Home Activities sheet only goes to rooms that asked for it (form choice or a note) */
-      const ag=g,ta=r.activities_page?P.takehome?.[ag]?.activities:null;
-      if(ta)jobs.push({key:"takehome-act|"+ag,actKey:"takehome-act|"+ag,id:"print|takehome-act|"+ag,room:r,activity:"Take-Home Activities",what:ta.coloring?`${ag} Elementary activities page (Coloring Page on the back)`:`${ag} Elementary activities page`,pdf:ta.pdf,pdfPages:ta.pdf_pages,from:1,to:ta.pdf_pages,partPages:ta.pdf_pages,copies:n,pick:null,sheets:n,paper:"plain",duplex:ta.pdf_pages===2,cut:false,note:"1 per kid",group:ag});}
+    /* take-home pages are no longer printed per room: 50 Younger and 50 Older of each are printed in bulk (see takeHomeBulk) */
   }
   for(const x of (S.prog.extras||[]).filter(x=>x.print)){const r=P.rooms.find(r=>r.key===x.room);if(r)jobs.push({key:"extra|"+x.id,actKey:"extra|"+x.id,id:"print|extra|"+x.id,room:r,activity:"Added in chat",what:x.item,pdf:null,copies:x.qty||1,pick:null,sheets:x.qty||1,paper:"plain",note:x.note||""})}
   return jobs;
 }
+/* ---------- take-home pages: printed in bulk, not by room ----------
+   Every Sunday: 50 Younger and 50 Older of the Take-Home (Going Deeper on the back), and 50 Younger and 50 Older
+   of the Take-Home Activities page (Younger has the Coloring Page on the back). 200 sheets. */
+const BULK=50;
+function takeHomeBulk(){
+  const sun=S.plan?.sunday||S.week;if(!sun)return [];
+  const T=S.plan?.takehome||{},PI=(typeof LIVE!=="undefined"&&LIVE.pi&&LIVE.pi.takehome)||{},out=[];
+  for(const g of ["Younger","Older"]){
+    const t=T[g]||PI[`${sun}|${g}`];if(!t)continue;
+    if(t.pdf)out.push({id:`print|bulk|${g}|th`,group:g,label:`${g} Take-Home`,what:"Take-Home with Going Deeper on the back",pdf:t.pdf,pages:t.pdf_pages||2,duplex:(t.pdf_pages||2)===2});
+    const a=t.activities;
+    if(a&&a.pdf)out.push({id:`print|bulk|${g}|act`,group:g,label:`${g} Take-Home Activities`,what:a.coloring?"Take-Home Activities with the Coloring Page on the back":"Take-Home Activities page",pdf:a.pdf,pages:a.pdf_pages||1,duplex:(a.pdf_pages||1)===2});
+  }
+  return out;
+}
+function bulkSection(){
+  const L=takeHomeBulk();if(!L.length)return "";
+  const dis=DL===null?"disabled title=\"Downloads aren't available in this view\"":"";
+  const sheets=L.length*BULK;
+  return `<section class="bulk"><h3>Take-home pages</h3><p class="small">Printed in bulk, not by room: ${BULK} Younger and ${BULK} Older of each. ${sheets} sheets. Each PDF already has all ${BULK} copies in it.</p>
+  <div class="tablewrap"><table class="cklist"><tbody>${L.map(x=>`<tr class="${S.prog.checks?.[x.id]?"done":""}"><td style="width:36px">${ck(x.id,"Printed "+x.label)}</td>
+    <td><b>${esc(x.label)}</b><div class="small">${esc(x.what)}</div></td>
+    <td><b>${BULK} copies</b>, ${x.duplex?"two-sided":"one-sided"}<div class="acts"><button class="btn" data-bulk="${esc(x.id)}" ${dis}>Save PDF</button></div></td></tr>`).join("")}</tbody></table></div></section>`;
+}
+async function makeBulk(x){
+  const L=PDFLib,src=await L.PDFDocument.load(await pdfBytes(x.pdf)),n=src.getPageCount(),doc=await L.PDFDocument.create();
+  const emb=await doc.embedPdf(src,[...Array(n).keys()]);   // each page is stored once and drawn on every copy, so 50 copies stay small
+  for(let c=0;c<BULK;c++)for(const e of emb){const pg=doc.addPage([e.width,e.height]);pg.drawPage(e,{x:0,y:0,width:e.width,height:e.height})}
+  return await doc.save();
+}
+document.addEventListener("click",async e=>{
+  const b=e.target.closest("button[data-bulk]");if(!b)return;e.preventDefault();
+  if(!DL){toast("Downloads aren't available in this view.");return}
+  try{if(window.__needPDF)await window.__needPDF()}catch(_){toast("The PDF builder didn't load. Check the connection and try again.");return}
+  try{await window.__needPDF()}catch(_){toast("The PDF builder didn't load. Check the connection and try again.");return}
+  const x=takeHomeBulk().find(x=>x.id===b.dataset.bulk);if(!x)return;
+  const label=b.textContent;b.disabled=true;b.textContent="Building…";
+  try{const bytes=await makeBulk(x);
+    await DL.save({filename:`${S.plan?.sunday||S.week} ${x.label} x${BULK}.pdf`,data:new Blob([bytes],{type:"application/pdf"})});
+    toast(`Downloading. Print it ${x.duplex?"two-sided":"one-sided"}, one copy: all ${BULK} are in the file.`);
+  }catch(err){console.error(err);toast("Couldn't build that PDF. Try again.")}
+  finally{b.disabled=false;b.textContent=label}
+});
 const pgs=(f,t)=>f===t?`p. ${f}`:`pp. ${f}–${t}`;
 let DL;  /* downloads capability: undefined = loading, null = unavailable */
 function pdfName(i){const d=S.plan?.sunday||"";const base=(i.activity+" "+(i.group&&i.group!=="All"?i.group:"")).replace(/[^A-Za-z0-9 ]+/g," ").replace(/\s+/g," ").trim();return `${d} ${base}`.slice(0,120)+".pdf"}
@@ -3915,7 +3959,7 @@ function rCount(){
 }
 function rPrintActs(){
   const items=printItems();
-  if(!items.length){$("#view").innerHTML=`<h2>Print</h2>${printSwitch()}<div class="empty">Nothing to print for this Sunday. Rooms that pick activities with printables show up here.</div>`;return}
+  if(!items.length){$("#view").innerHTML=`<h2>Print</h2>${printSwitch()}${bulkSection()}<div class="empty">Nothing to print for this Sunday. Rooms that pick activities with printables show up here.</div>`;return}
   const tot=items.reduce((s,i)=>s+i.sheets,0),card=items.reduce((s,i)=>s+i.parts.filter(p=>p.paper==="cardstock").reduce((t,p)=>t+p.sheets,0),0);
   const tags=p=>[p.paper==="cardstock"?'<span class="flag warn">Cardstock</span>':"",p.duplex?'<span class="flag ok">Double-sided</span>':"",p.cut?'<span class="flag">Cut out</span>':""].join(" ")||'<span class="small">Plain</span>';
   const partLine=p=>{
@@ -3924,7 +3968,7 @@ function rPrintActs(){
   const whole=i=>{const P=i.parts;if(P.length<2||i.unknown||P.some(p=>p.pick)||new Set(P.map(p=>p.copies)).size>1)return "";
     const cov=P.reduce((s,p)=>s+(p.to-p.from+1),0);if(cov!==i.pdfPages)return "";
     return `<div class="whole">Print all ${i.pdfPages} pages, <b>${P[0].copies} ${P[0].copies===1?"copy":"copies"}</b></div>`};
-  let h=`<h2>Print</h2>${printSwitch()}<p class="sub">One PDF per activity, biggest jobs first. About ${Math.ceil(tot)} sheets total${card?`, ${Math.ceil(card)} on cardstock`:""}.</p>
+  let h=`<h2>Print</h2>${printSwitch()}${bulkSection()}<p class="sub">One PDF per activity, biggest jobs first. About ${Math.ceil(tot)} sheets total${card?`, ${Math.ceil(card)} on cardstock`:""}.</p>
   <div class="tablewrap"><table><thead><tr><th style="width:36px"></th><th>Activity</th><th>Pages and how many</th><th>Rooms</th></tr></thead><tbody>`+
   items.map(i=>`<tr class="${S.prog.checks?.[i.id]?"done":""}"><td>${ck(i.id,"Printed "+i.activity)}</td>
     <td><b>${esc(i.activity)}</b>${i.group&&i.group!=="All"?` <span class="small">${esc(i.group)}</span>`:""}
@@ -3946,11 +3990,11 @@ function roomPackets(){
 function packetSheets(pk){return pk?Math.ceil(pk.segments.reduce((t,s)=>t+Packets.segPages(s,pk.twoSided),0)/(pk.twoSided?2:1)):0}
 function rPrint(){if(S.printView==="acts")return rPrintActs();
   const list=roomPackets();
-  if(!list.length){$("#view").innerHTML=`<h2>Print</h2>${printSwitch()}<div class="empty">Nothing to print for this Sunday. Rooms that pick activities with printables show up here.</div>`;return}
+  if(!list.length){$("#view").innerHTML=`<h2>Print</h2>${printSwitch()}${bulkSection()}<div class="empty">Nothing to print for this Sunday. Rooms that pick activities with printables show up here.</div>`;return}
   const plainTot=list.reduce((t,x)=>t+(x.info.plain?packetSheets(x.info.plain)+1:0),0),cardTot=list.reduce((t,x)=>t+packetSheets(x.info.card),0);
   const anyMissing=list.some(x=>x.info.missing.length),anyCard=list.some(x=>x.info.card);
   const dis=DL===null?"disabled title=\"Downloads aren't available in this view\"":"";
-  let h=`<h2>Print</h2>${printSwitch()}<p class="sub">One packet per room. Print each one <b>two-sided</b>. About ${plainTot} sheets of paper${cardTot?` and ${cardTot} of cardstock`:""}.</p>
+  let h=`<h2>Print</h2>${printSwitch()}${bulkSection()}<p class="sub">One packet per room. Print each one <b>two-sided</b>. About ${plainTot} sheets of paper${cardTot?` and ${cardTot} of cardstock`:""}.</p>
   <div class="acts" style="margin-bottom:10px"><button class="btn primary" data-allpk="plain" ${dis}>Save every room in one file</button>${anyCard?`<button class="btn" data-allpk="card" ${dis}>Save all cardstock in one file</button>`:""}</div>
   ${anyMissing?'<p><span class="flag bad">Some rooms need a headcount</span> <span class="small">Those pages are left out of the packet until the number is set on the Headcounts tab.</span></p>':""}`;
   const bands=[...new Set(list.map(x=>band(x.r)))];
@@ -3981,7 +4025,7 @@ async function makePackets(list,kind){
 }
 async function savePacket(btn,list,kind,name){
   if(!DL){toast("Downloads aren't available in this view.");return}
-  try{await window.__needPDF()}catch(_){toast("The PDF builder didn't load. Check the connection and try again.");return}
+  if(!window.PDFLib){toast("The PDF builder didn't load. Refresh the page.");return}
   const label=btn.textContent;btn.disabled=true;btn.textContent="Building…";
   try{const bytes=await makePackets(list,kind);
     await DL.save({filename:name,data:new Blob([bytes],{type:"application/pdf"})});
@@ -4022,7 +4066,7 @@ function rPreview(){
   const sec=S.pvSec||"acts";
   let h=`<h2>Preview: ${esc(dl)}</h2><p class="sub"><b>${esc(P.title)}</b>. Every activity teachers can pick, before any forms come in.</p>
   <div class="seg" role="group" aria-label="Preview view"><button class="btn ${sec==="acts"?"primary":""}" data-pvs="acts">By activity</button><button class="btn ${sec==="closet"?"primary":""}" data-pvs="closet">Everything, by closet</button></div>
-  <p class="small"><b>Every room:</b> the Take-Home with Going Deeper on the back, 1 per kid, two-sided. <b>Only if asked:</b> the Take-Home Activities page${["Younger","Older"].filter(g=>P.takehome?.[W+"|"+g]?.activities?.coloring).length?` with the Coloring Page on the back (${["Younger","Older"].filter(g=>P.takehome?.[W+"|"+g]?.activities?.coloring).join(" and ")})`:""}, for rooms that pick “Coloring/Activity Page” on the form.</p>
+  <p class="small"><b>Take-home pages</b> are printed in bulk, not by room: ${BULK} Younger and ${BULK} Older of the Take-Home (Going Deeper on the back) and of the Take-Home Activities page${["Younger","Older"].filter(g=>P.takehome?.[W+"|"+g]?.activities?.coloring).length?` (Coloring Page on the back for ${["Younger","Older"].filter(g=>P.takehome?.[W+"|"+g]?.activities?.coloring).join(" and ")})`:""}. They're ready on the Print tab.</p>
   ${P.memory_verse?'<p><span class="flag ok">First Sunday</span> <span class="small">Every room gets the Memory Verse page this week, no matter what they pick.</span></p>':""}`;
   if(sec==="acts"){
     for(const g of ["Younger","Older","Large Group"]){const acts=P.groups[g];if(!acts)continue;
@@ -4031,7 +4075,7 @@ function rPreview(){
         const pulls=a.items.filter(i=>i.class==="pull"),other=a.items.filter(i=>i.class!=="pull"&&i.key!=="none");
         h+=`<div class="card"><div><b style="font-size:15.5px">${esc(a.name)}</b>${a.phase?` <span class="small">${esc(a.phase)}</span>`:""}</div>
         ${pulls.length?`<ul class="pk">${pulls.map(i=>{const inv=invOf(i.key);return `<li>${esc(cap(i.item))} <b>${esc(ruleText(i))}</b>${inv?.closet&&inv.status!=="out"&&inv.status!=="not_seen"?` <span class="small">${esc(inv.closet)}</span>`:""}${inv?statusFlag(inv.status):' <span class="flag warn">not in inventory</span>'}</li>`}).join("")}</ul>`:`<div class="small" style="margin:8px 0">Nothing to pull.</div>`}
-        ${a.print.length?`<div class="small" style="font-weight:700">Print</div><ul class="pk">${a.print.map(p=>p.kind==="takehome"?`<li>Take-Home page <span class="small">(every room gets it anyway)</span></li>`:`<li>${esc(p.what)} <b>${esc(printRule(p))}</b>${p.paper==="cardstock"?' <span class="flag warn">Cardstock</span>':""}${p.pdf?` <button class="btn" data-pdf="${esc(p.pdf)}" data-name="${esc(W+" "+a.name+".pdf")}">PDF</button>`:""}</li>`).join("")}</ul>`:""}
+        ${a.print.length?`<div class="small" style="font-weight:700">Print</div><ul class="pk">${a.print.map(p=>p.kind==="takehome"?`<li>Take-Home page <span class="small">(printed in bulk on the Print tab)</span></li>`:`<li>${esc(p.what)} <b>${esc(printRule(p))}</b>${p.paper==="cardstock"?' <span class="flag warn">Cardstock</span>':""}${p.pdf?` <button class="btn" data-pdf="${esc(p.pdf)}" data-name="${esc(W+" "+a.name+".pdf")}">PDF</button>`:""}</li>`).join("")}</ul>`:""}
         ${other.length?`<div class="small">Already in rooms or teacher brings: ${esc(other.map(i=>i.item).join(", "))}</div>`:""}</div>`;}
       h+=`</div>`;}
   }else{
@@ -4576,8 +4620,10 @@ $("#chatClear").onclick=()=>{CHAT.ctl?.abort();CHAT.turns=[];saveChat();drawChat
       text:`${P.rooms.length} rooms answered${miss?`, ${miss} still missing`:""}${late?`, ${late} late`:""}. Closes ${P.cutoff||"Wednesday at noon"}.`});
     const need=P.rooms.filter(r=>needsCount(r)&&S.prog.headcounts?.[r.key]==null).length;
     out.push({n:"Headcounts",tab:"count",go:"Headcounts",state:need?"warn":"done",text:need?`${need} room${need>1?"s":""} need a number`:"Every room has a number"});
-    const ids=roomPackets().flatMap(x=>[x.info.plain?"print|room|"+x.r.key:null,x.info.card?"print|card|"+x.r.key:null]).filter(Boolean),pd=ids.filter(i=>c[i]).length;
-    out.push({n:"Print",tab:"print",go:"Print",state:!ids.length||pd===ids.length?"done":pd?"doing":"todo",text:ids.length?`${pd} of ${ids.length} packets printed`:"Nothing to print"});
+    const pkIds=roomPackets().flatMap(x=>[x.info.plain?"print|room|"+x.r.key:null,x.info.card?"print|card|"+x.r.key:null]).filter(Boolean),thIds=takeHomeBulk().map(x=>x.id),ids=pkIds.concat(thIds),pd=ids.filter(i=>c[i]).length;
+    const pkDone=pkIds.filter(i=>c[i]).length,thDone=thIds.filter(i=>c[i]).length;
+    out.push({n:"Print",tab:"print",go:"Print",state:!ids.length||pd===ids.length?"done":pd?"doing":"todo",
+      text:ids.length?[pkIds.length?`${pkDone} of ${pkIds.length} packets`:"",thIds.length?`${thDone} of ${thIds.length} take-home stacks`:""].filter(Boolean).join(", ")+" printed":"Nothing to print"});
     const pi=pullItems(),pu=pi.filter(i=>c["pull|"+i.key]).length;
     out.push({n:"Pull from closets",tab:"pull",go:"Pull",state:!pi.length||pu===pi.length?"done":pu?"doing":"todo",text:`${pu} of ${pi.length} items pulled`});
     const br=P.rooms.filter(r=>c["bin|"+r.key]).length;
