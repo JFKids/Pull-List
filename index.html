@@ -3246,7 +3246,8 @@ section.bulk td .acts{margin-top:8px}
   /* "britezip/<zip>/<image>.jpg" -> a one-page landscape PDF with the slide, like the Memory Verse page */
   async function slidePage(u){
     const L=await pdfLib(),img=new Uint8Array(await getBytes(u+"#raw")),doc=await L.PDFDocument.create();
-    const pic=await doc.embedJpg(img),W=792,H=612,s=Math.min(W/pic.width,H/pic.height)*0.96;
+    const png=img[0]===0x89&&img[1]===0x50&&img[2]===0x4e&&img[3]===0x47;   // slide decks often store PNG
+    const pic=await (png?doc.embedPng(img):doc.embedJpg(img)),W=792,H=612,s=Math.min(W/pic.width,H/pic.height)*0.96;
     doc.addPage([W,H]).drawImage(pic,{x:(W-pic.width*s)/2,y:(H-pic.height*s)/2,width:pic.width*s,height:pic.height*s});
     return doc.save();
   }
@@ -3264,7 +3265,7 @@ section.bulk td .acts{margin-top:8px}
     if(/^(https?:|data:|blob:)/i.test(u)&&realFetch)return realFetch(url,opts);
     try{
       if(/^(brite|custom)\/.+\?p=[\d,]+$/.test(u)){if(!madeCache.has(u))madeCache.set(u,britePages(u).catch(e=>{madeCache.delete(u);throw e}));return new Response(new Blob([await madeCache.get(u)],{type:"application/pdf"}),{status:200})}
-      if(/^britezip\/.+\.jpe?g$/i.test(u)){if(!madeCache.has(u))madeCache.set(u,slidePage(u).catch(e=>{madeCache.delete(u);throw e}));return new Response(new Blob([await madeCache.get(u)],{type:"application/pdf"}),{status:200})}
+      if(/^britezip\/.+\.(jpe?g|png)$/i.test(u)){if(!madeCache.has(u))madeCache.set(u,slidePage(u).catch(e=>{madeCache.delete(u);throw e}));return new Response(new Blob([await madeCache.get(u)],{type:"application/pdf"}),{status:200})}
       if(/^engine\/(curriculum|print_index)\.json$/.test(u)&&!(opts&&opts.raw)){
         await bootP.catch(()=>null);
         if(STATIC)return new Response(new Blob([JSON.stringify(/curriculum/.test(u)?STATIC.cur:STATIC.pi)],{type:"application/json"}),{status:200});
@@ -3384,8 +3385,8 @@ section.bulk td .acts{margin-top:8px}
     async profiles(ids){if(!peopleCache)peopleCache=await run("people").catch(()=>[]);const o={};[].concat(ids).forEach(id=>{const p=peopleCache.find(x=>x.id===id);o[id]={id,name:p?p.name:""}});return o}
   };
 
-  const FORM_NAMES=["Timestamp","Name","Classroom","Grade level","Number of kids","8:30/11:30 K-2 activities","8:30/11:30 3rd-5th activities","10 AM K-3rd grade activities","Anything else","10 AM K-3rd"];
-  const mcp={async callTool(){const c=await run("formCsv");try{const h=String(c).split("\n")[0].split(",");window.APP.formMissing=h.map((x,i)=>/^missing\d+$/.test(x.trim())?FORM_NAMES[i]:null).filter(Boolean)}catch(_){}return {payload:{content:c}}}};
+  const FORM_NAMES=["Timestamp","Name","Classroom Number","Grade Level","Number of kids","Younger Elementary (1st-2nd)","Older Elementary (3rd-5th)","","Anything else you need?","",""];
+  const mcp={async callTool(){const c=await run("formCsv");try{const h=String(c).split("\n")[0].split(",");window.APP.formMissing=h.map((x,i)=>/^missing\d+$/.test(x.trim())&&FORM_NAMES[i]?FORM_NAMES[i]:null).filter(Boolean)}catch(_){}return {payload:{content:c}}}};
 
   /* downloads: save the file, and show an Open button in case the browser blocks the save */
   const downloads={async save({filename,data}){
@@ -3525,8 +3526,8 @@ if(typeof module!=="undefined")module.exports=root.Packets;
    Keep in sync with build_week.py; test_engine.js checks they agree. */
 (function(root){
 const IN_ROOM=['bible','coloring suppl','writing suppl','crayon'];
-const TEACHER_BRINGS=['timer','video player','music player','upbeat','worship music','worship song','christmas music','sound effects','phone','intro video','review video','memory verse video','none','mirror'];
-const PRINT_WORDS=['printable','take-home','teaching slide','teaching image','teaching pic'];
+const TEACHER_BRINGS=['playlist','timer','video player','music player','upbeat','worship music','worship song','christmas music','sound effects','phone','intro video','review video','memory verse video','none','mirror'];
+const PRINT_WORDS=['printable','take-home','take home','teaching slide','teaching image','teaching pic'];
 const norm=s=>(s||'').toLowerCase().replace(/&/g,'and').replace(/[^a-z0-9]/g,'');
 
 /* difflib.SequenceMatcher(None,a,b).ratio() for short strings (no autojunk below 200 chars) */
@@ -3566,7 +3567,10 @@ function splitActs(cell){
   for(const ch of cell){if(ch==='(')depth++;if(ch===')')depth--;
     if(ch===','&&depth===0){if(cur.trim()){out.push(cur.trim());cur='';continue}}cur+=ch}
   if(cur.trim())out.push(cur.trim());
-  return out.map(o=>{const m=o.match(/^([^(:]+?)\s*(?::.*?)?(\((.*)\))?$/);return [m?m[1].trim():o,o]});
+  return out.map(o=>{
+    if(/^\s*bible teaching\s*:/i.test(o))return ['Bible Teaching',o];   // the form's "Bible Teaching: Printable Pages" box
+    const n=o.replace(/^\s*(belong|believe|become)\s*:\s*/i,'');          // the form labels each activity by its Brite segment
+    const m=n.match(/^([^(:]+?)\s*(?::.*?)?(\((.*)\))?$/);return [m?m[1].trim():n,o]});
 }
 function qtyRule(item){
   const i=item.trim().replace(/,+$/,'');
@@ -3610,16 +3614,16 @@ function buildWeek(csvText,cur,PI,sunday,now){
   const data=rows.slice(1).filter(r=>r.length&&r[0].trim()).map(r=>r.concat(Array(Math.max(0,hdr.length-r.length)).fill('')));
   const week=cur[sunday]||{sunday,title:'(curriculum not loaded)',groups:{}};
   const [Y,M,D]=sunday.split('-').map(Number);const sun=new Date(Y,M-1,D);
-  const cutoff=new Date(Y,M-1,D-4,12,0,0);const windowStart=addDays(cutoff,-7);
+  const cutoff=new Date(Y,M-1,D-4,12,0,0);const windowStart=new Date(Y,M-1,D-7,13,0,0);   // after last Sunday's classes; a late request for last Sunday stays there
   const actIndex=w=>{const idx={};for(const G of ['Older','Younger','Large Group'])for(const a of (w.groups[G]?.activities||[])){idx[norm(a.name)]=[G,a];for(const k of (a.aka||[]))if(!idx[norm(k)])idx[norm(k)]=[G,a]}return idx};   // aka: an old name the form may still use
   const thisIdx=actIndex(week);const allIdx={};for(const [d,w] of Object.entries(cur))allIdx[d]=actIndex(w);
   const match=(name,idx)=>{const n=norm(name);if(idx[n])return idx[n];let best=null,bs=-1;
     for(const k of Object.keys(idx)){const r=ratio(n,k);if(r>bs){bs=r;best=k}}return best!==null&&bs>=0.78?idx[best]:null};
-  const rowWeek=r=>{const votes={};for(const col of [5,6,7,9])for(const [nm] of splitActs(r[col]||''))for(const [d,idx] of Object.entries(allIdx))if(idx[norm(nm)])votes[d]=(votes[d]||0)+1;
+  const rowWeek=r=>{const votes={};for(const col of [5,6,7,9])for(const [nm] of splitActs(r[col]||''))for(const [d,idx] of Object.entries(allIdx))if(idx[norm(nm)]&&idx[norm(nm)][0]!=='Large Group')votes[d]=(votes[d]||0)+1;
     let best=null,bv=0;for(const [d,v] of Object.entries(votes))if(v>bv){bv=v;best=d}return best};
   const entries=[];
   for(const r of data){const ts=parseTs(r[0]);if(!ts)continue;
-    const e={ts,teacher:r[1].trim(),room:parseRoom(r[2]),hour:parseHour(r[2]),raw_room:r[2].trim(),grade:r[3].trim(),raw_count:r[4].trim(),count:parseCount(r[4]),row:r,week:rowWeek(r)};
+    const e={ts,teacher:r[1].trim(),room:parseRoom(r[2]),hour:parseHour(r[10]||'')||parseHour(r[2]),raw_room:r[2].trim(),grade:r[3].trim(),raw_count:r[4].trim(),count:parseCount(r[4]),row:r,week:rowWeek(r)};
     if(e.week===null&&windowStart<ts&&ts<=addDays(cutoff,3))e.week=sunday;
     entries.push(e)}
   const mode=a=>{const c={};let b=null,bc=0;for(const x of a){c[x]=(c[x]||0)+1}for(const x of a)if(c[x]>bc){bc=c[x];b=x}return b};
@@ -3665,10 +3669,11 @@ function buildWeek(csvText,cur,PI,sunday,now){
           if(q.class==='print'){if(q.item.toLowerCase().includes('take-home'))prints.push({what:'Take-Home page',kind:'takehome'});continue}
           items.push(q)}}
       (PI.parts[`${sunday}|${A.group}|${a.name}`]||[]).forEach((p,i)=>prints.push({kind:'part',id:`${A.group}|${a.name}|${i}`,activity:a.name,group:A.group,what:p.what,rule:p.rule,paper:p.paper,duplex:p.duplex,cut:p.cut,note:p.note,pdf:p.pdf,pdf_pages:p.pdf_pages,pdf_from:p.pdf_from,pdf_to:p.pdf_to,part_pages:p.part_pages,src_file:p.src_file,pages:p.pages}));
+      if(items.length&&items.every(q=>q.class==='teacher')&&!prints.length)continue;   // nothing to pull or print (a playlist)
       acts.push({name:a.name,phase:a.phase||'Large Group',group:A.group,matched:true,items,print:prints})}
     if(group==='Large Group'){const o=[...R.activities.values()].find(A=>A.group!=='Large Group');group=o?o.group:null}
     if(!group){const gr=R.grades.join(' ').toLowerCase();  // nothing matched: use the column, then the grade, then the hour
-      group=R.col_group||(/4th|5th/.test(gr)||(gr.includes('3rd')&&R.hour!=='10:00')?'Older':gr?'Younger':null)||(R.hour==='10:00'?'Younger':'Older')}
+      group=R.col_group||(/3rd|4th|5th/.test(gr)?'Older':gr?'Younger':null)||(R.hour==='10:00'?'Younger':'Older')}
     if(PI.memory_verse[sunday]?.first_week)acts.unshift({name:'Memory Verse (first Sunday of the month)',phase:'Every room',group,matched:true,items:[],
       print:[{kind:'part',id:'memory-verse',activity:'Memory Verse',group:'All',what:'Memory Verse page',rule:{k:'fixed',n:1},paper:'plain',duplex:false,cut:false,note:'Every room gets one for the month',pdf:PI.memory_verse[sunday].pdf,pdf_pages:1,pdf_from:1,pdf_to:1,part_pages:1,src_file:'Teaching slides',pages:[1]}]});
     const o={};for(const k of ['key','hour','room','teachers','grades','headcount','headcount_source','raw_counts','requests','submitted','late'])o[k]=R[k];o.activities_page=R.activities_page||null;
