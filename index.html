@@ -2319,7 +2319,7 @@ var qrcode = function() {
 </script>
 <title>Pull List</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700..800&family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700..800&family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&display=swap" media="print" onload="this.media='all';window.__fcss=1" onerror="window.__fcss=1">
 <style>
 /* Layout: one working column. Sticky header with the week and its progress, then five steps in the order the job is done. */
 :root{
@@ -2819,7 +2819,7 @@ function plExit(root,o){
   var F=window.fetch;
   if(F)window.fetch=function(){inflight++;lastNet=Date.now();return F.apply(this,arguments).finally(function(){inflight--;lastNet=Date.now()})};
   window.addEventListener("load",function(){loaded=true});
-  try{document.fonts.ready.then(function(){fonts=true})}catch(_){fonts=true}
+  var fq=false;function fontCheck(){if(fonts||fq||!window.__fcss)return;fq=true;try{document.fonts.ready.then(function(){fonts=true})}catch(_){fonts=true}}   /* the font list loads beside the page; then wait for the fonts */
   function el(i){return document.getElementById(i)}
   function step(t){var s=el("pl-step");if(s&&s.textContent!==t)s.textContent=t}
   function shown(){var v=el("view");return !!v&&v.children.length>0&&!/^\s*Loading/.test(v.textContent||"")}
@@ -2835,6 +2835,7 @@ function plExit(root,o){
   }
   function ready(){
     if(!el("view"))return true;              /* the page was replaced by a message page (bad link and so on) */
+    fontCheck();
     if((!loaded||!fonts)&&Date.now()-t0<2500){step("Opening");return false}   /* fonts get a moment so the app doesn't flash, never more */
     return dataDone();
   }
@@ -3234,8 +3235,21 @@ section.bulk td .acts{margin-top:8px}
     const s=document.createElement("script");s.src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js";
     s.onload=()=>window.PDFLib?res(window.PDFLib):backup();s.onerror=backup;document.head.appendChild(s)}));
   window.addEventListener("load",()=>setTimeout(()=>{const go=()=>pdfLib().catch(()=>{});window.requestIdleCallback?requestIdleCallback(go,{timeout:5000}):go()},6000));
-  const bytesCache=new Map(),madeCache=new Map();
+  /* Curriculum PDFs kept on this phone (the browser's own storage, nobody else can see it). Dropped after 3 weeks. */
+  const PDFS="pl-pdf-v1",PAGE_AGE=21*864e5,pk=p=>location.origin+"/__pdf/"+encodeURIComponent(p);
+  async function pdfGet(p){try{const c=await caches.open(PDFS),r=await c.match(pk(p));if(!r)return null;
+    const at=Number(r.headers.get("x-at"))||0;if(Date.now()-at>PAGE_AGE){c.delete(pk(p));return null}return {blob:await r.blob()}}catch(_){return null}}
+  function pdfPut(p,blob){try{caches.open(PDFS).then(c=>c.put(pk(p),new Response(blob,{headers:{"content-type":blob.type||"application/pdf","x-at":String(Date.now())}}))).catch(()=>{})}catch(_){}}
+  function pdfPrune(){try{caches.open(PDFS).then(async c=>{for(const q of await c.keys()){const r=await c.match(q);if(!r||Date.now()-(Number(r.headers.get("x-at"))||0)>PAGE_AGE)c.delete(q)}}).catch(()=>{})}catch(_){}}
+  const bytesCache=new Map(),madeCache=new Map(),inflight=new Map();
   const getBytes=p=>{if(!bytesCache.has(p))bytesCache.set(p,window.fetch(p).then(r=>{if(!r.ok){bytesCache.delete(p);throw new Error("not_found")}return r.arrayBuffer()}));return bytesCache.get(p)};
+  /* Get this week's PDFs onto the phone in the background, one at a time, so Save PDF only has to cut pages */
+  let warming=null;
+  window.__warmPDFs=list=>{
+    const files=[...new Set((list||[]).filter(Boolean).map(u=>String(u).split("?p=")[0]).filter(u=>/^(pdf|brite|britezip|custom)\//.test(u)))];
+    if(!files.length)return warming||Promise.resolve();
+    const go=async()=>{for(const f of files){try{await getBytes(f.replace(/^(britezip\/.+\.(?:jpe?g|png))$/i,"$1#raw"))}catch(_){}}};
+    warming=(warming||Promise.resolve()).then(go);pdfPrune();return warming};
   /* Brite originals: "brite/<file>.pdf?p=3,4,5" -> just those pages, cut here in the browser */
   async function britePages(u){
     const [file,q]=u.split("?p="),pages=q.split(",").map(Number);
@@ -3272,16 +3286,29 @@ section.bulk td .acts{margin-top:8px}
         return merged(u,await window.fetch(u,{raw:true}));}
     }catch(e){return new Response("",{status:404})}
     try{
-      /* big files come over in pieces; each piece is retried a few times */
-      const p=u.replace(/^\.?\//,"").replace(/#raw$/,""),parts=[];let off=0,mime="application/octet-stream",more=true;
-      while(more){let r,tries=0;
-        for(;;){try{r=await run("file",{path:p,offset:off});break}catch(e){if(/bad_path|not_found/.test(e.message)||++tries>=3)throw e;await new Promise(z=>setTimeout(z,800*tries))}}
-        window.__maxCall=Math.max(window.__maxCall||0,r.b64.length);
-        const bin=atob(r.b64),a=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)a[i]=bin.charCodeAt(i);
-        parts.push(a);mime=r.mime;off+=a.length;more=r.more&&a.length>0}
-      return new Response(new Blob(parts,{type:mime}),{status:200});
+      /* big files come over in pieces; each piece is retried a few times.
+         Curriculum PDFs are kept on this phone after the first download, so printing doesn't wait on the server again. */
+      const p=u.replace(/^\.?\//,"").replace(/#raw$/,"");
+      if(inflight.has(p))return new Response(await inflight.get(p),{status:200});   /* already coming down (the background fetch): wait for it */
+      let done;inflight.set(p,new Promise((ok,no)=>{done={ok,no}}));inflight.get(p).catch(()=>{});
+      try{const blob=await fileBlob(p);done.ok(blob);return new Response(blob,{status:200})}
+      catch(e){done.no(e);throw e}finally{inflight.delete(p)}
     }catch(e){return new Response("",{status:404})}
   };
+  async function fileBlob(p){{
+      const keepIt=/^(pdf|brite|britezip|custom)\//.test(p),kept=keepIt?await pdfGet(p):null;
+      if(kept)return kept.blob;
+      const piece=async off=>{let tries=0;
+        for(;;){try{return await run("file",{path:p,offset:off})}catch(e){if(/bad_path|not_found/.test(e.message)||++tries>=3)throw e;await new Promise(z=>setTimeout(z,800*tries))}}};
+      const bytes=r=>{window.__maxCall=Math.max(window.__maxCall||0,r.b64.length);const bin=atob(r.b64),a=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)a[i]=bin.charCodeAt(i);return a};
+      const first=await piece(0),parts=[bytes(first)],mime=first.mime||"application/octet-stream";
+      if(first.more&&first.size>parts[0].length){   /* the rest of the pieces at once, not one after another */
+        const step=parts[0].length,offs=[];for(let o=step;o<first.size;o+=step)offs.push(o);
+        const got=new Array(offs.length);let i=0;await Promise.all([0,1,2,3].map(async()=>{while(i<offs.length){const k=i++;got[k]=bytes(await piece(offs[k]))}}));got.forEach(a=>parts.push(a));}   /* at most 4 at a time */
+      const blob=new Blob(parts,{type:mime});
+      if(keepIt)pdfPut(p,blob);
+      return blob;
+  }}
 
   /* ---------- shared documents with polling ---------- */
   const cache={},seen={},listeners={},pending={},quiet={},lastWrite={},weeksCbs=new Set();let weeksList=[];  /* seen = what this screen last showed */
@@ -3807,7 +3834,7 @@ document.addEventListener("click",async e=>{
   const b=e.target.closest("button[data-bulk]");if(!b)return;e.preventDefault();
   if(!DL){toast("Downloads aren't available in this view.");return}
   try{if(window.__needPDF)await window.__needPDF()}catch(_){toast("The PDF builder didn't load. Check the connection and try again.");return}
-  try{await window.__needPDF()}catch(_){toast("The PDF builder didn't load. Check the connection and try again.");return}
+  if(!window.PDFLib){toast("The PDF builder didn't load. Check the connection and try again.");return}
   const x=takeHomeBulk().find(x=>x.id===b.dataset.bulk);if(!x)return;
   const label=b.textContent;b.disabled=true;b.textContent="Building…";
   try{const bytes=await makeBulk(x);
@@ -4030,7 +4057,8 @@ async function makePackets(list,kind){
 }
 async function savePacket(btn,list,kind,name){
   if(!DL){toast("Downloads aren't available in this view.");return}
-  if(!window.PDFLib){toast("The PDF builder didn't load. Refresh the page.");return}
+  try{if(window.__needPDF)await window.__needPDF()}catch(_){toast("The PDF builder didn't load. Check the connection and try again.");return}
+  if(!window.PDFLib){toast("The PDF builder didn't load. Check the connection and try again.");return}
   const label=btn.textContent;btn.disabled=true;btn.textContent="Building…";
   try{const bytes=await makePackets(list,kind);
     await DL.save({filename:name,data:new Blob([bytes],{type:"application/pdf"})});
@@ -4983,6 +5011,23 @@ $("#chatClear").onclick=()=>{CHAT.ctl?.abort();CHAT.turns=[];saveChat();drawChat
     const pct=Math.round(Math.max(.85,Math.min(1.6,px/17))*100);   /* 17pt is the iPhone's default size */
     if(pct!==100){document.documentElement.style.webkitTextSizeAdjust=pct+"%";document.documentElement.style.textSizeAdjust=pct+"%";document.documentElement.dataset.textsize=pct}
   }catch(_){}})();
+
+  /* ---------- faster printing: this week's PDFs come down to the phone ahead of time ----------
+     Admins: a few seconds after the app opens. Everyone else: when they open the Print tab. */
+  let warmedFor="",upAt=Date.now();
+  function weekPDFs(){const out=[];
+    for(const r of (S.plan&&S.plan.rooms)||[])for(const a of r.activities||[])for(const p of a.print||[])if(p.pdf)out.push(p.pdf);
+    try{for(const x of takeHomeBulk())out.push(x.pdf)}catch(_){}
+    return out}
+  function warmWeek(){
+    if(!window.__warmPDFs||!S.plan||!S.plan.sunday||warmedFor===S.plan.sunday)return;
+    if(!(ME.admin||S.tab==="print"))return;
+    const wait=Math.max(0,8000-(Date.now()-upAt));   // let the app finish opening first
+    warmedFor=S.plan.sunday;
+    setTimeout(()=>{const go=()=>{if(window.__needPDF)window.__needPDF().catch(()=>{});window.__warmPDFs(weekPDFs())};window.requestIdleCallback?requestIdleCallback(go,{timeout:4000}):go()},wait);
+  }
+  const baseRender=window.render;
+  if(typeof baseRender==="function"){window.render=function(){const r=baseRender.apply(this,arguments);try{warmWeek()}catch(_){}return r};try{render=window.render}catch(_){}}
 })();
 
 /* Fast start: when the curriculum changes on the server while the app is open (a new month was built), use it right away */

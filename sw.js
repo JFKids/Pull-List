@@ -1,7 +1,7 @@
 /* JF Kids Pull List: opens with no signal (F1) and shows alerts (F2).
    Fast start: the page opens from the copy kept on this phone, and a fresh copy is fetched behind it.
    When the fresh copy is different, the page is told so it can offer "Update". */
-const SHELL='pl-shell-v2',KEEP=[SHELL,'pl-data-v1','pl-meta'];
+const SHELL='pl-shell-v2',KEEP=[SHELL,'pl-data-v1','pl-meta','pl-pdf-v1'];
 const FILES=['./index.html','./icon-180.png','./icon-192.png','./icon-512.png','./favicon.png'];
 let updateWaiting=false;
 self.addEventListener('install',e=>{e.waitUntil(caches.open(SHELL).then(c=>c.addAll(FILES.map(f=>new Request(f,{cache:'no-cache'})))).then(()=>self.skipWaiting()))});
