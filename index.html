@@ -3597,7 +3597,7 @@ function splitActs(cell){
   return out.map(o=>{
     if(/^\s*bible teaching\s*:/i.test(o))return ['Bible Teaching',o];   // the form's "Bible Teaching: Printable Pages" box
     const n=o.replace(/^\s*(belong|believe|become)\s*:\s*/i,'');          // the form labels each activity by its Brite segment
-    const m=n.match(/^([^(:]+?)\s*(?::.*?)?(\((.*)\))?$/);return [m?m[1].trim():n,o]});
+    return [n.split(/[(:]/)[0].trim()||n.trim(),o]});   // the name is what comes before the supplies, even if the option is missing its ")"
 }
 function qtyRule(item){
   const i=item.trim().replace(/,+$/,'');
@@ -3645,12 +3645,14 @@ function buildWeek(csvText,cur,PI,sunday,now){
   const actIndex=w=>{const idx={};for(const G of ['Older','Younger','Large Group'])for(const a of (w.groups[G]?.activities||[])){idx[norm(a.name)]=[G,a];for(const k of (a.aka||[]))if(!idx[norm(k)])idx[norm(k)]=[G,a]}return idx};   // aka: an old name the form may still use
   const thisIdx=actIndex(week);const allIdx={};for(const [d,w] of Object.entries(cur))allIdx[d]=actIndex(w);
   const match=(name,idx)=>{const n=norm(name);if(idx[n])return idx[n];let best=null,bs=-1;
-    for(const k of Object.keys(idx)){const r=ratio(n,k);if(r>bs){bs=r;best=k}}return best!==null&&bs>=0.78?idx[best]:null};
-  const rowWeek=r=>{const votes={};for(const col of [5,6,7,9])for(const [nm] of splitActs(r[col]||''))for(const [d,idx] of Object.entries(allIdx))if(idx[norm(nm)]&&idx[norm(nm)][0]!=='Large Group')votes[d]=(votes[d]||0)+1;
+    for(const k of Object.keys(idx)){const r=ratio(n,k);if(r>bs){bs=r;best=k}}if(best!==null&&bs>=0.78)return idx[best];
+    let pre=null;for(const k of Object.keys(idx))if(k.length>=5&&n.startsWith(k)&&(!pre||k.length>pre.length))pre=k;return pre?idx[pre]:null};   // "Prayer Reverse Charades Bibles…" still finds Prayer Reverse Charades
+  const near=(d,ts)=>{const [y,m,dd]=d.split('-').map(Number),t=new Date(y,m-1,dd,23,59);return ts<=t&&t-ts<=22*864e5};   // a request is for a Sunday within 3 weeks after it was sent, never an old one
+  const rowWeek=(r,ts)=>{const votes={};for(const col of [5,6,7,9])for(const [nm] of splitActs(r[col]||''))for(const [d,idx] of Object.entries(allIdx))if(idx[norm(nm)]&&idx[norm(nm)][0]!=='Large Group'&&near(d,ts))votes[d]=(votes[d]||0)+1;
     let best=null,bv=0;for(const [d,v] of Object.entries(votes))if(v>bv){bv=v;best=d}return best};
   const entries=[];
   for(const r of data){const ts=parseTs(r[0]);if(!ts)continue;
-    const e={ts,teacher:r[1].trim(),room:parseRoom(r[2]),hour:parseHour(r[10]||'')||parseHour(r[2]),raw_room:r[2].trim(),grade:r[3].trim(),raw_count:r[4].trim(),count:parseCount(r[4]),row:r,week:rowWeek(r)};
+    const e={ts,teacher:r[1].trim(),room:parseRoom(r[2]),hour:parseHour(r[10]||'')||parseHour(r[2]),raw_room:r[2].trim(),grade:r[3].trim(),raw_count:r[4].trim(),count:parseCount(r[4]),row:r,week:rowWeek(r,ts)};
     if(e.week===null&&windowStart<ts&&ts<=addDays(cutoff,3))e.week=sunday;
     entries.push(e)}
   const mode=a=>{const c={};let b=null,bc=0;for(const x of a){c[x]=(c[x]||0)+1}for(const x of a)if(c[x]>bc){bc=c[x];b=x}return b};
@@ -3674,6 +3676,7 @@ function buildWeek(csvText,cur,PI,sunday,now){
       for(const [nm,raw] of splitActs(e.row[col]||'')){if(!R.col_group)R.col_group=G;const hit=match(nm,thisIdx);
         if(hit){const [g,a]=hit;if(!R.activities.has(a.name))R.activities.set(a.name,{group:g,activity:a,raw})}
         else if(ACT_OPT.test(nm))R.activities_page='form';
+        else if(/^\s*take[\s-]*home(\s+page)?\s*$/i.test(nm))continue;   // take-home pages print in bulk for every room
         else if(!R.activities.has(nm))R.activities.set(nm,{group:G,activity:null,raw})}
     const note=(e.row[8]||'').trim();
     if(note&&!['no','none','na','thanks','thankyou','nothanks'].includes(norm(note))){R.requests.push({teacher:e.teacher,text:note});}
@@ -3682,7 +3685,7 @@ function buildWeek(csvText,cur,PI,sunday,now){
   for(const R of rooms.values()){
     const acts=[];let group=null;
     for(const [nm,A] of R.activities){const a=A.activity;group=group||A.group;
-      if(!a){const m=A.raw.match(/\((.*)\)\s*$/s);const items=[],prints=[];
+      if(!a){const m=A.raw.match(/\((.*?)\)?\s*$/s);const items=[],prints=[];
         for(let piece of splitTop(m?m[1]:'')){piece=piece.trim().replace(/:\s*/g,' (')+(piece.includes(':')?')':'');
           if(!piece.trim())continue;const q=qtyRule(piece);q.class=classify(q.item);q.key=canon(q.item);
           if(q.class==='print'){const l=q.item.toLowerCase();prints.push({what:q.item,kind:l.includes('take-home')?'takehome':l.includes('teaching')?'slide':'unknown'});continue}
@@ -4671,6 +4674,8 @@ $("#chatClear").onclick=()=>{CHAT.ctl?.abort();CHAT.turns=[];saveChat();drawChat
     const st=steps(),next=st.find(s=>s.state!=="done");
     let h=`<h2>This week</h2><p class="sub"><b>${E(sundayText(wk))}</b>${S.plan&&S.plan.title?` · ${E(S.plan.title)}`:""}</p>`;
     if(ME.admin&&APP.formMissing&&APP.formMissing.length)h+=`<div class="banner bad"><b>The form changed.</b> These questions can't be found anymore: ${E(APP.formMissing.join(", "))}. Rooms may be missing answers. Rename them back, or tell Claude what changed.</div>`;
+    {const odd=new Map();for(const r of (S.plan&&S.plan.rooms)||[])for(const x of r.activities||[])if(x.matched===false){if(!odd.has(x.name))odd.set(x.name,[]);odd.get(x.name).push(r.room)}
+     if(odd.size)h+=`<div class="banner bad"><b>${odd.size===1?"An answer doesn't":odd.size+" answers don't"} match this week's lesson,</b> so nothing gets pulled or printed for ${odd.size===1?"it":"them"}. ${[...odd].map(([n,rs])=>`“${E(n)}” (room${rs.length>1?"s":""} ${E(rs.join(", "))})`).join("; ")}. Check the room on Bins, or fix that option on the form.</div>`}
     if(next)h+=`<div class="next"><span>Next</span><b>${E(next.n)}</b> ${E(next.text)} <button class="btn primary" data-goto="${next.tab}">${E(next.go)}</button></div>`;
     else h+=`<div class="next done"><span>Ready</span><b>Everything is done for this Sunday.</b></div>`;
     /* N5: the whole step row is one button */
