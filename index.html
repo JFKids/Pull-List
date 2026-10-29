@@ -3790,23 +3790,29 @@ function printJobs(){
   const P=S.plan,jobs=[];if(!P)return jobs;
   for(const r of P.rooms){
     const n=hc(r);let th=false;const seen=new Set();
+    const thActs={};   // activities that use the Take-Home sheet as a supply, by age group
     for(const a of r.activities)for(const p of a.print){
-      if(p.kind==="takehome"){th=true;continue}
+      if(p.kind==="takehome"){th=true;if(a.matched&&(a.group==="Younger"||a.group==="Older"))(thActs[a.group]=thActs[a.group]||[]).push(a.name);continue}
       if(p.kind!=="part"||seen.has(p.id))continue;seen.add(p.id);
       const pp=p.part_pages??p.pdf_pages,from=p.pdf_from??1,c=partCount(p.rule,n,pp);
       const to=c.pick?from+c.pick-1:(p.pdf_to??p.pdf_pages);
       jobs.push({key:p.id,actKey:`${p.group}|${p.activity}`,id:`print|${p.id}`,room:r,activity:p.activity,what:p.what,pdf:p.pdf,pdfPages:p.pdf_pages,from,to,partPages:pp,copies:c.copies,pick:c.pick,
         sheets:c.copies==null?null:(c.pick??pp*c.copies)/(p.duplex?2:1),paper:p.paper,duplex:p.duplex,cut:p.cut,note:p.note,group:p.group});
     }
-    /* take-home pages are no longer printed per room: 50 Younger and 50 Older of each are printed in bulk (see takeHomeBulk) */
+    /* a room doing an activity that uses the Take-Home sheet gets 1 per kid in its packet (one set covers every such activity in the room).
+       Everyone else is covered by the bulk stacks (see takeHomeBulk). */
+    for(const g of Object.keys(thActs)){const t=P.takehome?.[g];if(!t||!t.pdf)continue;const pp=t.pdf_pages||2,acts=[...new Set(thActs[g])];
+      jobs.push({key:"takehome|"+g,actKey:"takehome|"+g,id:"print|takehome|"+r.key+"|"+g,room:r,activity:acts.join(" / "),what:`${g} Take-Home sheet`+(pp===2?" (Going Deeper on the back)":""),pdf:t.pdf,pdfPages:pp,from:1,to:pp,partPages:pp,
+        copies:n,pick:null,sheets:n==null?null:n*pp/(pp===2?2:1),paper:"plain",duplex:pp===2,cut:false,note:"1 per kid, used in "+acts.join(" and "),group:g})}
   }
   for(const x of (S.prog.extras||[]).filter(x=>x.print)){const r=P.rooms.find(r=>r.key===x.room);if(r)jobs.push({key:"extra|"+x.id,actKey:"extra|"+x.id,id:"print|extra|"+x.id,room:r,activity:"Added in chat",what:x.item,pdf:null,copies:x.qty||1,pick:null,sheets:x.qty||1,paper:"plain",note:x.note||""})}
   return jobs;
 }
 /* ---------- take-home pages: printed in bulk, not by room ----------
-   Every Sunday: 50 Younger and 50 Older of the Take-Home (Going Deeper on the back), and 50 Younger and 50 Older
-   of the Take-Home Activities page (Younger has the Coloring Page on the back). 200 sheets. */
-const BULK=50;
+   Every Sunday: 20 Younger and 20 Older of the Take-Home (Going Deeper on the back), and 20 Younger and 20 Older
+   of the Take-Home Activities page (Younger has the Coloring Page on the back). 80 sheets.
+   Rooms doing an activity that uses the Take-Home sheet get their own copies in their packet (see printJobs). */
+const BULK=20;
 function takeHomeBulk(){
   const sun=S.plan?.sunday||S.week;if(!sun)return [];
   const T=S.plan?.takehome||{},PI=(typeof LIVE!=="undefined"&&LIVE.pi&&LIVE.pi.takehome)||{},out=[];
@@ -3822,7 +3828,7 @@ function bulkSection(){
   const L=takeHomeBulk();if(!L.length)return "";
   const dis=DL===null?"disabled title=\"Downloads aren't available in this view\"":"";
   const sheets=L.length*BULK;
-  return `<section class="bulk"><h3>Take-home pages</h3><p class="small">Printed in bulk, not by room: ${BULK} Younger and ${BULK} Older of each. ${sheets} sheets. Each PDF already has all ${BULK} copies in it.</p>
+  return `<section class="bulk"><h3>Take-home pages</h3><p class="small">Printed in bulk: ${BULK} Younger and ${BULK} Older of each. ${sheets} sheets. Rooms doing an activity that uses the Take-Home sheet also get 1 per kid in their packet. Each PDF already has all ${BULK} copies in it.</p>
   <div class="tablewrap"><table class="cklist"><tbody>${L.map(x=>`<tr class="${S.prog.checks?.[x.id]?"done":""}"><td style="width:36px">${ck(x.id,"Printed "+x.label)}</td>
     <td><b>${esc(x.label)}</b><div class="small">${esc(x.what)}</div></td>
     <td><b>${BULK} copies</b>, ${x.duplex?"two-sided":"one-sided"}<div class="acts"><button class="btn" data-bulk="${esc(x.id)}" ${dis}>Save PDF</button></div></td></tr>`).join("")}</tbody></table></div></section>`;
@@ -4102,7 +4108,7 @@ function rPreview(){
   const sec=S.pvSec||"acts";
   let h=`<h2>Preview: ${esc(dl)}</h2><p class="sub"><b>${esc(P.title)}</b>. Every activity teachers can pick, before any forms come in.</p>
   <div class="seg" role="group" aria-label="Preview view"><button class="btn ${sec==="acts"?"primary":""}" data-pvs="acts">By activity</button><button class="btn ${sec==="closet"?"primary":""}" data-pvs="closet">Everything, by closet</button></div>
-  <p class="small"><b>Take-home pages</b> are printed in bulk, not by room: ${BULK} Younger and ${BULK} Older of the Take-Home (Going Deeper on the back) and of the Take-Home Activities page${["Younger","Older"].filter(g=>P.takehome?.[W+"|"+g]?.activities?.coloring).length?` (Coloring Page on the back for ${["Younger","Older"].filter(g=>P.takehome?.[W+"|"+g]?.activities?.coloring).join(" and ")})`:""}. They're ready on the Print tab.</p>
+  <p class="small"><b>Take-home pages</b> are printed in bulk: ${BULK} Younger and ${BULK} Older of the Take-Home (Going Deeper on the back) and of the Take-Home Activities page${["Younger","Older"].filter(g=>P.takehome?.[W+"|"+g]?.activities?.coloring).length?` (Coloring Page on the back for ${["Younger","Older"].filter(g=>P.takehome?.[W+"|"+g]?.activities?.coloring).join(" and ")})`:""}. They're ready on the Print tab. Rooms doing an activity that uses the Take-Home sheet also get 1 per kid in their packet.</p>
   ${P.memory_verse?'<p><span class="flag ok">First Sunday</span> <span class="small">Every room gets the Memory Verse page this week, no matter what they pick.</span></p>':""}`;
   if(sec==="acts"){
     for(const g of ["Younger","Older","Large Group"]){const acts=P.groups[g];if(!acts)continue;
@@ -4111,7 +4117,7 @@ function rPreview(){
         const pulls=a.items.filter(i=>i.class==="pull"),other=a.items.filter(i=>i.class!=="pull"&&i.key!=="none");
         h+=`<div class="card"><div><b style="font-size:15.5px">${esc(a.name)}</b>${a.phase?` <span class="small">${esc(a.phase)}</span>`:""}</div>
         ${pulls.length?`<ul class="pk">${pulls.map(i=>{const inv=invOf(i.key);return `<li>${esc(cap(i.item))} <b>${esc(ruleText(i))}</b>${inv?.closet&&inv.status!=="out"&&inv.status!=="not_seen"?` <span class="small">${esc(inv.closet)}</span>`:""}${inv?statusFlag(inv.status):' <span class="flag warn">not in inventory</span>'}</li>`}).join("")}</ul>`:`<div class="small" style="margin:8px 0">Nothing to pull.</div>`}
-        ${a.print.length?`<div class="small" style="font-weight:700">Print</div><ul class="pk">${a.print.map(p=>p.kind==="takehome"?`<li>Take-Home page <span class="small">(printed in bulk on the Print tab)</span></li>`:`<li>${esc(p.what)} <b>${esc(printRule(p))}</b>${p.paper==="cardstock"?' <span class="flag warn">Cardstock</span>':""}${p.pdf?` <button class="btn" data-pdf="${esc(p.pdf)}" data-name="${esc(W+" "+a.name+".pdf")}">PDF</button>`:""}</li>`).join("")}</ul>`:""}
+        ${a.print.length?`<div class="small" style="font-weight:700">Print</div><ul class="pk">${a.print.map(p=>p.kind==="takehome"?`<li>Take-Home sheet <b>1 per kid</b> <span class="small">(in the room\'s packet)</span></li>`:`<li>${esc(p.what)} <b>${esc(printRule(p))}</b>${p.paper==="cardstock"?' <span class="flag warn">Cardstock</span>':""}${p.pdf?` <button class="btn" data-pdf="${esc(p.pdf)}" data-name="${esc(W+" "+a.name+".pdf")}">PDF</button>`:""}</li>`).join("")}</ul>`:""}
         ${other.length?`<div class="small">Already in rooms or teacher brings: ${esc(other.map(i=>i.item).join(", "))}</div>`:""}</div>`;}
       h+=`</div>`;}
   }else{
