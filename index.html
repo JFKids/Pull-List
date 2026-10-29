@@ -3106,6 +3106,9 @@ section.bulk h3{margin:0 0 4px}
 section.bulk .tablewrap{margin-top:8px}
 section.bulk td .acts{margin-top:8px}
 
+/* Bins: class packet buttons */
+.card .acts.binpk{align-items:center;flex-wrap:wrap;gap:8px 12px;margin:4px 0 8px}
+
 </style>
 <header>
   <div class="wrap" style="padding-block:0">
@@ -4199,6 +4202,12 @@ function binItems(r,J){
 }
 function rArrange(){
   const P=S.plan,J=printJobs(),hours=[...new Set(P.rooms.map(band))],c=S.prog.checks||{};
+  const PK=new Map(roomPackets().map(x=>[x.r.key,x])),dis=DL===null?"disabled title=\"Downloads aren't available in this view\"":"";
+  /* the room's whole packet (and cardstock, if it has any), same files as the Print tab */
+  const pkBtns=r=>{const x=PK.get(r.key);if(!x||(!x.info.plain&&!x.info.card))return "";const pid="print|room|"+r.key,cid="print|card|"+r.key;
+    return `<h4>Class packet</h4><div class="acts binpk">${x.info.plain?`<button class="btn primary" data-pk="${esc(r.key)}" data-kind="plain" ${dis}>Print class packet</button><span class="small">${packetSheets(x.info.plain)+1} sheets, two-sided${c[pid]?" · printed":""}</span>`:""}</div>
+      ${x.info.card?`<div class="acts binpk"><button class="btn" data-pk="${esc(r.key)}" data-kind="card" ${dis}>Print cardstock</button><span class="small">${packetSheets(x.info.card)} sheets of cardstock, ${x.info.card.twoSided?"two-sided":"one-sided"}${c[cid]?" · printed":""}</span></div>`:""}
+      ${x.info.missing.length?`<div class="small"><span class="flag bad">set headcount</span> ${esc(x.info.missing.map(m=>m.activity).join(", "))} left out until it's set</div>`:""}`};
   let h=`<h2>Breakroom bins</h2><p class="sub">One bin per room. Rooms that meet at two hours get two bins.</p>`;
   const li=x=>`<li class="binitem ${c[x.id]?"done":""}"><label>${ck(x.id,"In the bin: "+x.t)}<span>${esc(x.t)}${x.note?` <span class="small">(${esc(x.note)})</span>`:""}${binCl(x.id)}</span></label></li>`;
   for(const hr of hours){
@@ -4209,6 +4218,7 @@ function rArrange(){
         <h4>Activities they picked</h4><ul>${r.activities.map(a=>`<li>${esc(a.name)}${a.matched?"":' <span class="flag warn">not in this week\'s lesson</span>'}</li>`).join("")}</ul>
         ${B.sup.length?`<h4>Supplies</h4><ul class="bin">${B.sup.map(li).join("")}</ul>`:""}
         ${B.prt.length?`<h4>Printed</h4><ul class="bin">${B.prt.map(li).join("")}</ul>`:""}
+        ${pkBtns(r)}
         ${B.ext.length?`<h4>Added in chat</h4><ul class="bin">${B.ext.map(li).join("")}</ul>`:""}
         ${B.req.length?`<h4>Teacher asked for</h4><ul class="bin">${B.req.map(li).join("")}</ul>`:""}
         <label class="binrow">${ck(id,"Bin ready for "+r.room)} Bin ready <span class="small" style="font-weight:400">${done} of ${B.all.length} in the bin</span></label></div>`;
