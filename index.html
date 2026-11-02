@@ -3145,9 +3145,9 @@ section.bulk td .acts{margin-top:8px}
       <li>Every time you open this page it checks the Materials Request form and adds any new answers, so the list is always current. Tap <b>Refresh</b> next to the date to check again. It also rebuilds every Thursday morning after the form closes. Pick another Sunday from the "Week of" menu if you need it.</li>
       <li><b>Preview:</b> open this early in the week, before forms come in. It shows every activity teachers can pick for the Sunday you choose and what each one needs. Switch to <b>Everything, by closet</b> to see what we don't have yet so you can order early.</li>
       <li><b>Headcounts:</b> fix any room marked "Needs a number." Every quantity on the page updates when you change a headcount.</li>
-      <li><b>Print:</b> one packet per room. Tap <b>Save packet</b>, open it from your downloads, and print the whole file two-sided one time. The cover sheet says which room it belongs to. Rooms with cardstock activities also get a small cardstock packet. The first Sunday of each month adds a Memory Verse page for every room. Need to reprint one thing? Switch to <b>By activity</b>.</li>
+      <li><b>Print:</b> one packet per room. Tap <b>Save packet</b>, open it from your downloads, and print the whole file two-sided one time. The cover sheet says which room it belongs to. Rooms with cardstock activities also get a small cardstock packet. The first Sunday of each month adds a Memory Verse page for every room. Take-home pages print in bulk from the <b>Take-home pages</b> section at the top: one PDF per stack, every copy already in it. Rooms doing an activity that uses the Take-Home sheet get 1 per kid in their packet. Need to reprint one thing? Switch to <b>By activity</b>.</li>
       <li><b>Pull:</b> items are grouped by closet. Check each one off as you pull it. If it isn't where the page says, tap <b>Found it in…</b> or <b>Can't find it</b>. That's how the inventory learns.</li>
-      <li><b>Breakroom bins:</b> one card per room, sorted by hour. Check off each item as it goes in the bin. The bin turns green when everything is checked.</li>
+      <li><b>Breakroom bins:</b> one card per room, sorted by hour. Check off each item as it goes in the bin. The bin turns green when everything is checked. <b>Print class packet</b> on each card prints that room's packet. <b>Standing requests</b> come from the team's requests doc.</li>
       <li><b>Order &amp; follow up:</b> anything we're out of or couldn't find, teacher requests that need a person, and rooms that haven't turned in the form.</li>
       <li><b>Closet map:</b> search any item to see which closet and shelf it's on. Yellow "confirm" means I couldn't be sure from the photos. Check it once and tap <b>Found it in…</b> so it turns green.</li>
       <li>Bibles, coloring supplies and writing supplies are already in every room, so they never show up here. Phones and music are on the teacher.</li>
@@ -3228,7 +3228,7 @@ section.bulk td .acts{margin-top:8px}
     if(!b)return;b.className="done";b.textContent=state==="updated"?"Updated. You're looking at the latest.":"Up to date.";
     clearTimeout(b._t);b._t=setTimeout(()=>{const x=document.getElementById("freshbar");if(x&&x.className==="done")x.remove()},1800);
   }
-  const me=bootP.then(()=>ME).catch(()=>run("whoami",{page:PAGE}).catch(()=>null));me.then(m=>{if(m)return;const go=()=>{document.body.innerHTML='<div style="font:17px/1.5 Atkinson Hyperlegible,system-ui,sans-serif;padding:40px 24px;max-width:520px;color:#17202a"><h2 style="font:800 30px Bricolage Grotesque,system-ui,sans-serif;margin:0 0 10px">'+(KEY?"This link isn\u2019t active":"This link is missing its key")+'</h2><p>Open the personal link Elijah sent you. If it still doesn\u2019t work, ask him for a new one.</p></div>'};if(document.body)go();else document.addEventListener("DOMContentLoaded",go)});
+  const me=bootP.then(()=>ME).catch(()=>run("whoami",{page:PAGE}).catch(()=>null));me.then(m=>{if(m)return;const go=()=>{document.body.innerHTML='<div style="font:17px/1.5 Atkinson Hyperlegible,system-ui,sans-serif;padding:40px 24px;max-width:520px;color:#17202a"><h2 style="font:800 30px Bricolage Grotesque,system-ui,sans-serif;margin:0 0 10px">'+(KEY?"This link isn\u2019t active":"This link is missing its key")+'</h2><p>Open the personal link the JF Kids team sent you. If it still doesn\u2019t work, ask the team for a new one.</p></div>'};if(document.body)go();else document.addEventListener("DOMContentLoaded",go)});
   window.APP={key:KEY,run,me,boot:BOOT};
 
   /* relative file fetches (engine/*.json, pdf/*.pdf) come from the Drive folder */
@@ -3683,7 +3683,7 @@ function buildWeek(csvText,cur,PI,sunday,now){
       for(const [nm,raw] of splitActs(e.row[col]||'')){if(!R.col_group)R.col_group=G;const hit=match(nm,thisIdx);
         if(hit){const [g,a]=hit;if(!R.activities.has(a.name))R.activities.set(a.name,{group:g,activity:a,raw})}
         else if(ACT_OPT.test(nm))R.activities_page='form';
-        else if(/^\s*take[\s-]*home(\s+page)?\s*$/i.test(nm))continue;   // take-home pages print in bulk for every room
+        else if(/^\s*take[\s-]*home(\s+page)?\s*$/i.test(nm))continue;   // an old "Take Home Page" answer: take-home sheets come from the bulk stacks and from activities that use them
         else if(!R.activities.has(nm))R.activities.set(nm,{group:G,activity:null,raw})}
     const note=(e.row[8]||'').trim();
     if(note&&!['no','none','na','thanks','thankyou','nothanks'].includes(norm(note))){R.requests.push({teacher:e.teacher,text:note});}
@@ -3854,7 +3854,7 @@ function printJobs(){
   for(const x of (S.prog.extras||[]).filter(x=>x.print)){const r=P.rooms.find(r=>r.key===x.room);if(r)jobs.push({key:"extra|"+x.id,actKey:"extra|"+x.id,id:"print|extra|"+x.id,room:r,activity:"Added in chat",what:x.item,pdf:null,copies:x.qty||1,pick:null,sheets:x.qty||1,paper:"plain",note:x.note||""})}
   return jobs;
 }
-/* ---------- take-home pages: printed in bulk, not by room ----------
+/* ---------- take-home pages: bulk stacks for everyone, plus room copies for activities that use them ----------
    Every Sunday: 20 Younger and 20 Older of the Take-Home (Going Deeper on the back), and 20 Younger and 20 Older
    of the Take-Home Activities page (Younger has the Coloring Page on the back). 80 sheets.
    Rooms doing an activity that uses the Take-Home sheet get their own copies in their packet (see printJobs). */
@@ -3881,7 +3881,7 @@ function bulkSection(){
 }
 async function makeBulk(x){
   const L=PDFLib,src=await L.PDFDocument.load(await pdfBytes(x.pdf)),n=src.getPageCount(),doc=await L.PDFDocument.create();
-  const emb=await doc.embedPdf(src,[...Array(n).keys()]);   // each page is stored once and drawn on every copy, so 50 copies stay small
+  const emb=await doc.embedPdf(src,[...Array(n).keys()]);   // each page is stored once and drawn on every copy, so every copy stays small
   for(let c=0;c<BULK;c++)for(const e of emb){const pg=doc.addPage([e.width,e.height]);pg.drawPage(e,{x:0,y:0,width:e.width,height:e.height})}
   return await doc.save();
 }
@@ -4859,9 +4859,9 @@ $("#chatClear").onclick=()=>{CHAT.ctl?.abort();CHAT.turns=[];saveChat();drawChat
     home:"Each step of the week in order. The Next box shows what needs a person now. Tap a step to jump there.",
     preview:"Open this early in the week. It shows every activity teachers can pick and what each one needs. Switch to Everything, by closet to see what we don't have yet, so you can order early. The form closes Wednesday at noon.",
     count:"When a teacher leaves the count blank or writes “??”, the app uses that room's last number. Type last week's attendance to override it, or leave it blank to keep the number shown. Every quantity in the app updates when a headcount changes.",
-    print:"Tap Save packet, open it from your downloads, and print the whole file two-sided one time. The first sheet is a cover with the room and what's inside, so the stack sorts straight into bins. Blank pages are on purpose. Rooms with cardstock activities also get a small cardstock packet, and the first Sunday of each month adds a Memory Verse page. Need to reprint one thing? Switch to By activity.",
+    print:"Tap Save packet, open it from your downloads, and print the whole file two-sided one time. The first sheet is a cover with the room and what's inside, so the stack sorts straight into bins. Blank pages are on purpose. Rooms with cardstock activities also get a small cardstock packet, and the first Sunday of each month adds a Memory Verse page. Take-home stacks are at the top, every copy already in each PDF. Need to reprint one thing? Switch to By activity.",
     pull:"Items are grouped by closet. Check each one off as you pull it. If it isn't where the page says, tap Update, then Found it in… or Can't find it. That's how the inventory learns. Tap anywhere on a row to check it off. The rooms line shows how many each room gets.",
-    arrange:"Check off each thing as it goes in the bin. When everything is checked, the bin turns green on its own.",
+    arrange:"Check off each thing as it goes in the bin. When everything is checked, the bin turns green on its own. Print class packet prints that room's packet right from its card.",
     order:"Links open an Amazon search. Nothing is ordered automatically. Food items are a grocery run. Teacher requests and rooms that haven't turned in the form are further down.",
     closets:"Search any item to see its closet and shelf. Tap Edit to change where it lives or mark it Have, Running low or Out. Add an item puts something new on the map. If someone tapped the wrong thing on Pull, it shows under Recently changed at the bottom so you can fix it."
   };
