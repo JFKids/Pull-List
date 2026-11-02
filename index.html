@@ -3111,6 +3111,10 @@ section.bulk td .acts{margin-top:8px}
 
 /* Standing requests (from the requests doc) */
 .stdnote{margin:6px 0;padding:6px 10px;border-left:4px solid #f8bd00;background:#fff8e0;font-size:15px;line-height:1.35}
+/* Standing class picks on the Bins tab */
+.picks{border:2px dashed #006cb4;padding:10px 12px;margin:8px 0 12px;background:#f3f8fc}
+.picks .pickrow{display:flex;gap:10px;align-items:center;padding:6px 0;min-height:32px}
+.picks .pickrow input{width:22px;height:22px;accent-color:#006cb4;flex:none}
 
 </style>
 <header>
@@ -3278,7 +3282,7 @@ section.bulk td .acts{margin-top:8px}
   async function merged(u,base){
     const j=await base.json(),ms=await legacyMonths();
     if(/curriculum\.json$/.test(u))ms.forEach(m=>Object.assign(j,m.curriculum||{}));
-    else ms.forEach(m=>{const p=m.print||{};["parts","takehome","memory_verse"].forEach(k=>j[k]=Object.assign(j[k]||{},p[k]||{}))});
+    else ms.forEach(m=>{const p=m.print||{};["parts","takehome","memory_verse","pictures"].forEach(k=>j[k]=Object.assign(j[k]||{},p[k]||{}))});
     return new Response(new Blob([JSON.stringify(j)],{type:"application/json"}),{status:200});
   }
   window.fetch=async(url,opts)=>{
@@ -3752,7 +3756,7 @@ function previewWeek(cur,PI,sunday){
       return {name:a.name,phase:a.phase||'',items,print:prints}})}
   return {sunday,title:L.title,groups,memory_verse:!!PI.memory_verse[sunday]?.first_week,takehome:PI.takehome||{}};
 }
-root.PullEngine={buildWeek,parseCSV,ratio,previewWeek,canon,qtyRule};
+root.PullEngine={buildWeek,parseCSV,ratio,previewWeek,canon,qtyRule,parseRoom};
 if(typeof module!=='undefined')module.exports=root.PullEngine;
 })(typeof window!=='undefined'?window:globalThis);
 
@@ -3778,7 +3782,7 @@ function qty(it,n){if(it.kind==="fixed")return it.n;if(it.kind==="per")return n?
      All rooms: Add glue sticks, 1 per kid        Teacher Lisa Johnson: Note: Print her pages one-sided
      Room 253, 10:00, Nov 8 only: Add 1 roll of tape */
 const REQ={text:"",at:0,url:"",sections:{new:[],q:[],rules:[],done:[]},rules:[],bad:[]};
-const RULE_RE=/^(all rooms|teachers?\s+(.+?)|(?:rooms?\s+)?(.+?))\s*(?:,\s*(8:30|10:00|11:30)(?:\s*(?:am|a\.m\.))?)?\s*(?:,\s*([a-z]{3,9})\.?\s+(\d{1,2})\s+only)?\s*:\s*(add|skip|note)\b\s*:?\s*(.+)$/i;
+const RULE_RE=/^(all rooms|teachers?\s+(.+?)|(?:rooms?\s+)?(.+?))\s*(?:,\s*(8:30|10:00|11:30)(?:\s*(?:am|a\.m\.))?)?\s*(?:,\s*([a-z]{3,9})\.?(?:\s+(\d{1,2}))?\s+only)?\s*:\s*(add|skip|note|print|class)\b\s*:?\s*(.+)$/i;
 const MONIX={jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11};
 const roomToks=x=>String(x||"").toLowerCase().replace(/room|rooms/g,"").split(/[\/,&]|\band\b/).map(t=>t.replace(/[^a-z0-9]/g,"")).filter(Boolean).flatMap(t=>{const m=t.match(/(\d{3})$/);return m&&m[1]!==t?[t,m[1]]:[t]});
 function parseReqDoc(text){
@@ -3789,15 +3793,43 @@ function parseReqDoc(text){
   sec.rules.forEach((line,i)=>{const m=line.match(RULE_RE);if(!m){bad.push(line);return}
     const verb=m[7].toLowerCase(),what=m[8].trim().replace(/[.]$/,"");
     const r={id:"std"+i+"_"+line.toLowerCase().replace(/[^a-z0-9]/g,"").slice(0,40),line,all:/^all rooms$/i.test(m[1]),rooms:m[3]?roomToks(m[3]):[],teacher:m[2]?m[2].toLowerCase().trim():null,hour:m[4]||null,
-      date:m[5]&&MONIX[m[5].slice(0,3).toLowerCase()]!=null?{mo:MONIX[m[5].slice(0,3).toLowerCase()],d:+m[6]}:null,verb,what};
+      date:m[5]&&MONIX[m[5].slice(0,3).toLowerCase()]!=null?{mo:MONIX[m[5].slice(0,3).toLowerCase()],d:m[6]?+m[6]:null}:null,verb,what,roomText:m[3]||""};
     if(verb==="add"){let x=what.match(/^(.+?),\s*(\d+)\s+per\s+(?:(\d+)\s+)?kids?$/i);
       if(x)Object.assign(r,{item:x[1].trim(),kind:"per",n:+x[2],per:+(x[3]||1),plus:0});
       else{x=what.match(/^(\d+)\s+(.+)$/);Object.assign(r,x?{item:x[2].trim(),kind:"fixed",n:+x[1]}:{item:what,kind:"one",n:1})}
       r.key=PullEngine.canon(r.item)}
     else if(verb==="skip"){r.item=what;r.key=PullEngine.canon(what)}
+    else if(verb==="class"){   // a class that never sends the form: "Room 253, 8:30: Class: Ashley and Brent Estes, Older, 12 kids"
+      const g=/\bolder\b/i.test(what)?"Older":/\byounger\b/i.test(what)?"Younger":null,k=what.match(/(\d+)\s*kids?/i);
+      if(!r.hour||!g||!r.rooms.length){bad.push(line);return}
+      Object.assign(r,{teachers:what.split(",")[0].trim(),group:g,kids:k?+k[1]:null})}
+    else if(verb==="print"){   // take-home sheets, coloring pages, Bible Teaching pages and story pictures for this room's packet
+      r.th=/take[\s-]*home/i.test(what);r.act=/coloring|activit/i.test(what);r.coloring=/coloring/i.test(what);
+      r.bt=/bible\s*teaching|scripture/i.test(what);r.pics=/picture|slide/i.test(what);
+      if(!r.th&&!r.act&&!r.bt&&!r.pics){bad.push(line);return}
+      r.given=/(\d+)/.test(what);
+      r.group=/\bolder\b/i.test(what)?"Older":/\byounger\b/i.test(what)?"Younger":null;
+      let x=what.match(/(\d+)\s+per\s+(?:(\d+)\s+)?kids?/i);
+      if(x)Object.assign(r,{kind:"per",n:+x[1],per:+(x[2]||1),plus:0});
+      else{x=what.match(/^(\d+)\b/);Object.assign(r,x?{kind:"fixed",n:+x[1]}:{kind:"per",n:1,per:1,plus:0})}}
     rules.push(r)});
   return {sections:sec,rules,bad};
 }
+const PI_=()=>(typeof LIVE!=="undefined"&&LIVE.pi)||{parts:{},takehome:{},memory_verse:{},pictures:{}};
+/* Standing classes ("Class" rules): rooms that never send the form still get a bin every week.
+   The team picks their activities on the Bins tab; the picks are saved with that Sunday's progress. */
+function classRules(week){const sun=new Date(week+"T12:00");
+  return REQ.rules.filter(x=>x.verb==="class"&&(!x.date||(sun.getMonth()===x.date.mo&&(x.date.d==null||sun.getDate()===x.date.d))))}
+const classKey=x=>`${x.hour}|${PullEngine.parseRoom(x.roomText.trim().replace(/^rooms?\s+/i,""))}`;
+function addClassRows(csv,week){
+  const L=classRules(week);if(!L.length)return csv;
+  const [Y,M,D]=week.split("-").map(Number),wed=new Date(Y,M-1,D-4),ts=`${wed.getMonth()+1}/${wed.getDate()}/${wed.getFullYear()} 10:00:00`;   // the Wednesday morning before: on time
+  const q=v=>/[",\n]/.test(v)?'"'+String(v).replace(/"/g,'""')+'"':String(v);
+  const rows=L.map(x=>{const picks=(S.prog.picks||{})[classKey(x)]||[],acts=picks.join(", ");
+    return [ts,x.teachers,x.roomText.replace(/^rooms?\s+/i,""),x.group==="Older"?"4th and/or 5th":"2nd",x.kids??"",x.group==="Younger"?acts:"",x.group==="Older"?acts:"","","","",x.hour].map(q).join(",")});
+  return csv.replace(/\s*$/,"")+"\n"+rows.join("\n")+"\n";
+}
+function markClasses(plan,week){const keys=new Set(classRules(week).map(classKey));for(const r of plan.rooms||[])if(keys.has(r.key))r.std_class=true;return plan}
 function setReqDoc(d){if(!d||typeof d.text!=="string")return false;if(d.text===REQ.text)return false;
   try{Object.assign(REQ,{text:d.text,at:d.at||Date.now(),url:d.url||REQ.url},parseReqDoc(d.text))}catch(e){console.error(e);return false}return true}
 /* the rules that apply to one room this Sunday */
@@ -3805,7 +3837,7 @@ function stdFor(r){
   const sun=S.plan&&S.plan.sunday?new Date(S.plan.sunday+"T12:00"):null;
   return REQ.rules.filter(x=>{
     if(x.hour&&x.hour!==r.hour)return false;
-    if(x.date&&!(sun&&sun.getMonth()===x.date.mo&&sun.getDate()===x.date.d))return false;
+    if(x.date&&!(sun&&sun.getMonth()===x.date.mo&&(x.date.d==null||sun.getDate()===x.date.d)))return false;
     if(x.all)return true;
     if(x.teacher)return (r.teachers||[]).some(t=>{const a=t.toLowerCase(),b=x.teacher;return a===b||a.includes(b)||b.includes(a)});
     const mine=roomToks(r.room);return x.rooms.some(t=>mine.includes(t))})}
@@ -3845,9 +3877,29 @@ function printJobs(){
       jobs.push({key:p.id,actKey:`${p.group}|${p.activity}`,id:`print|${p.id}`,room:r,activity:p.activity,what:p.what,pdf:p.pdf,pdfPages:p.pdf_pages,from,to,partPages:pp,copies:c.copies,pick:c.pick,
         sheets:c.copies==null?null:(c.pick??pp*c.copies)/(p.duplex?2:1),paper:p.paper,duplex:p.duplex,cut:p.cut,note:p.note,group:p.group});
     }
+    /* Standing "Print" rules from the requests doc set this room's take-home and coloring counts; they win over the 1 per kid below */
+    const ov={};
+    for(const x of stdFor(r).filter(x=>x.verb==="print")){const g=x.group||(r.group==="Older"?"Older":"Younger"),c=qty(x,n);
+      if(x.th)ov[g+"|th"]={c,x};
+      if(x.act){const own=P.takehome?.[g]?.activities,yc=P.takehome?.Younger?.activities;
+        if(x.coloring&&g!=="Younger"&&!(own&&own.coloring)&&yc&&yc.coloring)ov["Younger|col"]={c,x};   // older classes asking for coloring get the Younger coloring page
+        else ov[g+"|act"]={c,x}}
+      if(x.bt){for(const [i,pp0] of (PI_().parts[`${P.sunday}|Large Group|Bible Teaching`]||[]).entries()){const id=`Large Group|Bible Teaching|${i}`;if(seen.has(id))continue;seen.add(id);
+        const pp=pp0.part_pages??pp0.pdf_pages,from=pp0.pdf_from??1,cc=x.given?{copies:c,pick:null}:partCount(pp0.rule,n,pp),to=cc.pick?from+cc.pick-1:(pp0.pdf_to??pp0.pdf_pages);
+        if(cc.copies===0)continue;
+        jobs.push({key:id,actKey:"Large Group|Bible Teaching",id:"print|"+id,room:r,activity:"Bible Teaching (standing request)",what:pp0.what,pdf:pp0.pdf,pdfPages:pp0.pdf_pages,from,to,partPages:pp,copies:cc.copies,pick:cc.pick,
+          sheets:cc.copies==null?null:(cc.pick??pp*cc.copies)/(pp0.duplex?2:1),paper:pp0.paper,duplex:pp0.duplex,cut:pp0.cut,note:x.line,group:"Large Group"})}}
+      if(x.pics){const cc=x.given?c:1;if(cc!==0)(PI_().pictures?.[P.sunday]||[]).forEach((pc,i)=>jobs.push({key:"std-pic|"+i,actKey:"std-pic",id:"print|std-pic|"+r.key+"|"+i,room:r,activity:"Story pictures (standing request)",
+        what:pc.what||"Bible story picture",pdf:pc.pdf,pdfPages:1,from:1,to:1,partPages:1,copies:cc,pick:null,sheets:cc,paper:"plain",duplex:false,cut:false,note:x.line,group:"Large Group"}))}}
+    for(const [k,o] of Object.entries(ov)){if(o.c===0)continue;   // "Print 0 take-home" turns them off; no headcount yet shows as "set headcount"
+      const [g,kind]=k.split("|"),T=P.takehome?.[g];let t=kind==="th"?T:T&&T.activities;if(!t||!t.pdf)continue;
+      if(kind==="col"){const m=t.pdf.match(/^(.*\?p=)([\d,]+)$/);if(!m)continue;const last=m[2].split(",").pop();t={...t,pdf:m[1]+last,pdf_pages:1}}   // just the Coloring Page
+      const pp=t.pdf_pages||(kind==="th"?2:1),what=kind==="th"?`${g} Take-Home sheet`+(pp===2?" (Going Deeper on the back)":""):kind==="col"?"Coloring Page (from the Younger take-home pages)":`${g} Take-Home Activities`+(t.coloring?" (Coloring Page on the back)":"");
+      jobs.push({key:"std-"+kind+"|"+g,actKey:"std-"+kind+"|"+g,id:"print|std-"+kind+"|"+r.key+"|"+g,room:r,activity:"Standing request",what,pdf:t.pdf,pdfPages:pp,from:1,to:pp,partPages:pp,
+        copies:o.c,pick:null,sheets:o.c==null?null:o.c*pp/(pp===2?2:1),paper:"plain",duplex:pp===2,cut:false,note:o.x.line,group:g})}
     /* a room doing an activity that uses the Take-Home sheet gets 1 per kid in its packet (one set covers every such activity in the room).
        Everyone else is covered by the bulk stacks (see takeHomeBulk). */
-    for(const g of Object.keys(thActs)){const t=P.takehome?.[g];if(!t||!t.pdf)continue;const pp=t.pdf_pages||2,acts=[...new Set(thActs[g])];
+    for(const g of Object.keys(thActs)){const t=P.takehome?.[g];if(!t||!t.pdf||ov[g+"|th"])continue;const pp=t.pdf_pages||2,acts=[...new Set(thActs[g])];
       jobs.push({key:"takehome|"+g,actKey:"takehome|"+g,id:"print|takehome|"+r.key+"|"+g,room:r,activity:acts.join(" / "),what:`${g} Take-Home sheet`+(pp===2?" (Going Deeper on the back)":""),pdf:t.pdf,pdfPages:pp,from:1,to:pp,partPages:pp,
         copies:n,pick:null,sheets:n==null?null:n*pp/(pp===2?2:1),paper:"plain",duplex:pp===2,cut:false,note:"1 per kid, used in "+acts.join(" and "),group:g})}
   }
@@ -4269,6 +4321,16 @@ function rPull(){
   }
   $("#view").innerHTML=h;
 }
+/* a standing class: the team picks this Sunday's activities here */
+function picksBox(r){const W=LIVE.cur&&LIVE.cur[S.plan.sunday];if(!W)return "";const g=r.group==="Older"?"Older":"Younger",mine=(S.prog.picks||{})[r.key]||[];
+  const acts=[...(W.groups[g]?.activities||[]),...(W.groups["Large Group"]?.activities||[]).filter(a=>a.name==="Bible Teaching")];
+  return `<div class="picks"><h4>Pick their activities${mine.length?"":' <span class="flag warn">needs picks</span>'}</h4><p class="small">This class doesn't send the form. Check what they'll do this Sunday, then save.</p>
+    ${acts.map(a=>`<label class="pickrow"><input type="checkbox" data-pick="${esc(r.key)}" value="${esc(a.name)}" ${mine.includes(a.name)?"checked":""}> <span>${a.phase?`<span class="small">${esc(a.phase)}:</span> `:""}${esc(a.name)}</span></label>`).join("")}
+    <div class="acts"><button class="btn primary" data-savepicks="${esc(r.key)}">Save picks</button></div></div>`}
+document.addEventListener("click",async e=>{const b=e.target.closest("button[data-savepicks]");if(!b)return;e.preventDefault();
+  const k=b.dataset.savepicks,names=[...document.querySelectorAll(`input[data-pick="${CSS.escape(k)}"]:checked`)].map(i=>i.value);
+  b.disabled=true;b.textContent="Saving…";saveProg({picks:{...(S.prog.picks||{}),[k]:names}});
+  try{await liveRefresh(false)}finally{toast(names.length?"Picks saved. The bin, pull list and packet now include them.":"Picks cleared.")}});
 /* every thing that goes in one room's bin, each with its own check id */
 function binItems(r,J){
   const n=hc(r),out={sup:[],prt:[],ext:[],req:[]},seen=new Set();
@@ -4295,7 +4357,8 @@ function rArrange(){
     h+=`<div class="hour">${esc(hr)}</div><div class="grid">`;
     for(const r of P.rooms.filter(x=>band(x)===hr)){const n=hc(r),id="bin|"+r.key,ready=!!c[id],B=binItems(r,J);
       const done=B.all.filter(x=>c[x.id]).length;
-      h+=`<div class="card ${ready?"ready":""}"><h3>${esc(r.room)}<span class="hc">${n??"?"} kids · ${esc(r.group||"")}</span></h3><div class="who">${esc(r.teachers.join(", "))}${r.late?' · <span class="flag warn">late</span>':""}</div>
+      h+=`<div class="card ${ready?"ready":""}"><h3>${esc(r.room)}<span class="hc">${n??"?"} kids · ${esc(r.group||"")}</span></h3><div class="who">${esc(r.teachers.join(", "))}${r.late?' · <span class="flag warn">late</span>':""}${r.std_class?' · <span class="flag ok">standing class</span>':""}</div>
+        ${r.std_class?picksBox(r):""}
         <h4>Activities they picked</h4><ul>${r.activities.map(a=>`<li>${esc(a.name)}${a.matched?"":' <span class="flag warn">not in this week\'s lesson</span>'}</li>`).join("")}</ul>
         ${B.sup.length?`<h4>Supplies</h4><ul class="bin">${B.sup.map(li).join("")}</ul>`:""}
         ${B.prt.length?`<h4>Printed</h4><ul class="bin">${B.prt.map(li).join("")}</ul>`:""}
@@ -4444,7 +4507,8 @@ function liveErrText(e){
 }
 function b64utf8(b){const bin=atob(b);const u=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)u[i]=bin.charCodeAt(i);return new TextDecoder().decode(u)}
 async function liveRefresh(manual){
-  if(!LIVE.mcp||LIVE.busy||!liveWeek(S.week))return;
+  if(LIVE.busy){LIVE.again=true;return}   // asked again while building (a new requests doc, new picks): build once more right after
+  if(!LIVE.mcp||!liveWeek(S.week))return;
   const week=S.week;LIVE.busy=true;LIVE.err=null;setSub();
   try{
     if(!LIVE.cur){const [c,p]=await Promise.all([fetch("engine/curriculum.json").then(r=>r.json()),fetch("engine/print_index.json").then(r=>r.json())]);LIVE.cur=c;LIVE.pi=p}
@@ -4454,7 +4518,7 @@ async function liveRefresh(manual){
     const pl=res?.payload;let csv=typeof pl==="object"&&pl?pl.content:(typeof pl==="string"?pl:"");
     if(!csv)throw {code:"engine"};
     if(!/^Timestamp/.test(csv)){try{csv=b64utf8(csv)}catch(_){throw {code:"engine"}}}
-    let plan;try{plan=PullEngine.buildWeek(csv,LIVE.cur,LIVE.pi,week)}catch(_){throw {code:"engine"}}
+    let plan;try{plan=markClasses(PullEngine.buildWeek(addClassRows(csv,week),LIVE.cur,LIVE.pi,week),week)}catch(_){throw {code:"engine"}}
     if(S.week!==week)return;
     LIVE.plan=plan;LIVE.week=week;LIVE.at=new Date();
     const strip=p=>p?JSON.stringify({...p,generated:""}):"";
@@ -4463,7 +4527,7 @@ async function liveRefresh(manual){
     if(changed&&S.db){try{await S.db.doc("weeks/"+week).set({plan,source:"page"});if(!S.weeks.includes(week)){S.weeks=[...S.weeks,week].sort()}}catch(_){}}
     if(manual)toast(changed?"Updated with the newest answers.":"Already up to date.");
   }catch(e){if(S.week===week){LIVE.err=liveErrText(e);LIVE.week=week}}
-  finally{LIVE.busy=false;setSub()}
+  finally{LIVE.busy=false;setSub();if(LIVE.again){LIVE.again=false;setTimeout(()=>liveRefresh(false),0)}}
 }
 document.addEventListener("click",e=>{if(e.target.closest("#liveRefresh"))liveRefresh(true)});
 document.addEventListener("visibilitychange",()=>{if(!document.hidden&&LIVE.at&&Date.now()-LIVE.at>5*60e3)liveRefresh(false)});
@@ -4479,7 +4543,7 @@ function subscribeWeek(){
     const dbPlan=s.exists?s.data().plan:null;
     S.plan=(LIVE.week===S.week&&LIVE.plan)?LIVE.plan:dbPlan;
     $("#lesson").textContent=S.plan?S.plan.title:"";setSub();render()},()=>render()));
-  S.unsub.push(S.db.doc("progress/"+S.week).onSnapshot(s=>{if(s.exists&&!s.metadata.hasPendingWrites){const d=s.data();S.prog={checks:{...(d.checks||{})},headcounts:{...(d.headcounts||{})},extras:[...(d.extras||[])]}}render()}));
+  S.unsub.push(S.db.doc("progress/"+S.week).onSnapshot(s=>{if(s.exists&&!s.metadata.hasPendingWrites){const d=s.data();S.prog={checks:{...(d.checks||{})},headcounts:{...(d.headcounts||{})},extras:[...(d.extras||[])],picks:{...(d.picks||{})}}}render()}));
   setSub();liveRefresh(false);
 }
 (async()=>{
@@ -4774,6 +4838,8 @@ $("#chatClear").onclick=()=>{CHAT.ctl?.abort();CHAT.turns=[];saveChat();drawChat
     if(ME.admin&&APP.formMissing&&APP.formMissing.length)h+=`<div class="banner bad"><b>The form changed.</b> These questions can't be found anymore: ${E(APP.formMissing.join(", "))}. Rooms may be missing answers. Rename them back, or tell Claude what changed.</div>`;
     {const odd=new Map();for(const r of (S.plan&&S.plan.rooms)||[])for(const x of r.activities||[])if(x.matched===false){if(!odd.has(x.name))odd.set(x.name,[]);odd.get(x.name).push(r.room)}
      if(odd.size)h+=`<div class="banner bad"><b>${odd.size===1?"An answer doesn't":odd.size+" answers don't"} match this week's lesson,</b> so nothing gets pulled or printed for ${odd.size===1?"it":"them"}. ${[...odd].map(([n,rs])=>`“${E(n)}” (room${rs.length>1?"s":""} ${E(rs.join(", "))})`).join("; ")}. Check the room on Bins, or fix that option on the form.</div>`}
+    {const need=((S.plan&&S.plan.rooms)||[]).filter(r=>r.std_class&&!((S.prog.picks||{})[r.key]||[]).length);
+     if(need.length)h+=`<div class="banner"><b>Standing class${need.length>1?"es need":" needs"} activity picks:</b> ${need.map(r=>E(r.hour+" room "+r.room+" ("+r.teachers.join(", ")+")")).join(", ")}. <button class="btn" data-goto="arrange">Open Bins</button></div>`}
     if(ME.admin&&window.__accWaiting)h+=`<div class="banner"><b>${window.__accWaiting} access request${window.__accWaiting>1?"s":""} waiting.</b> <button class="btn" data-goto="people">Open People</button></div>`;
     if(ME.admin&&REQ.at){const N=REQ.sections.new.length,Q=REQ.sections.q.length,R=REQ.rules.length,X=REQ.bad.length;
       const link=REQ.url?` <a href="${E(REQ.url)}" target="_blank" rel="noopener">Open the requests doc</a>`:"";
@@ -5138,7 +5204,7 @@ $("#chatClear").onclick=()=>{CHAT.ctl?.abort();CHAT.turns=[];saveChat();drawChat
   if(typeof baseRender==="function"){window.render=function(){const r=baseRender.apply(this,arguments);try{warmWeek()}catch(_){}return r};try{render=window.render}catch(_){}}
 
   /* ---------- the requests doc: read at boot, and again when the app comes back after a minute away ---------- */
-  const reqApply=d=>{try{if(setReqDoc(d))render()}catch(_){}};
+  const reqApply=d=>{try{if(setReqDoc(d)){if(REQ.rules.some(x=>x.verb==="class")&&typeof liveRefresh==="function")liveRefresh(false);render()}}catch(_){}};   // a standing class changes the plan itself
   if(window.__REQDOC)reqApply(window.__REQDOC);
   window.addEventListener("pl-reqdoc",()=>reqApply(window.__REQDOC));
   document.addEventListener("visibilitychange",()=>{if(document.hidden||!window.APP||!APP.run||Date.now()-(REQ.at||0)<60e3)return;
