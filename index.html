@@ -3600,11 +3600,16 @@ function parseRoom(s){
   const m=[...s.matchAll(/\b(\d{3})\b/g)].map(x=>x[1]).filter(x=>!['830','100','113'].includes(x));
   return m.length?[...new Set(m)].join('/'):s.trim()}
 function parseCount(s){const n=[...(s||'').matchAll(/\d+/g)].map(x=>+x[0]).filter(n=>n>0&&n<60);return n.length?Math.max(...n):null}
+let COMMA_NAMES=new Set();   // curriculum activity names that have a comma in them, like "Sit, Stand, Squat, Share"
 function splitActs(cell){
   const out=[];let depth=0,cur='';
   for(const ch of cell){if(ch==='(')depth++;if(ch===')')depth--;
     if(ch===','&&depth===0){if(cur.trim()){out.push(cur.trim());cur='';continue}}cur+=ch}
   if(cur.trim())out.push(cur.trim());
+  if(COMMA_NAMES.size)for(let i=0;i<out.length;i++){   // put a name with commas back together: "Sit", "Stand", "Squat", "Share (no supplies)"
+    let j=i;while(j+1<out.length&&!/[(]/.test(out[j])&&!/^\s*(belong|believe|become|bible teaching)\s*:/i.test(out[j+1]))j++;
+    for(;j>i;j--){const c=out.slice(i,j+1).join(', '),n=c.replace(/^\s*(belong|believe|become)\s*:\s*/i,'').split(/[(:]/)[0];
+      if(COMMA_NAMES.has(norm(n))){out.splice(i,j-i+1,c);break}}}
   return out.map(o=>{
     if(/^\s*bible teaching\s*:/i.test(o))return ['Bible Teaching',o];   // the form's "Bible Teaching: Printable Pages" box
     const n=o.replace(/^\s*(belong|believe|become)\s*:\s*/i,'');          // the form labels each activity by its Brite segment
@@ -3654,6 +3659,7 @@ function buildWeek(csvText,cur,PI,sunday,now){
   const [Y,M,D]=sunday.split('-').map(Number);const sun=new Date(Y,M-1,D);
   const cutoff=new Date(Y,M-1,D-4,12,0,0);const windowStart=new Date(Y,M-1,D-7,13,0,0);   // after last Sunday's classes; a late request for last Sunday stays there
   const actIndex=w=>{const idx={};for(const G of ['Older','Younger','Large Group'])for(const a of (w.groups[G]?.activities||[])){idx[norm(a.name)]=[G,a];for(const k of (a.aka||[]))if(!idx[norm(k)])idx[norm(k)]=[G,a]}return idx};   // aka: an old name the form may still use
+  COMMA_NAMES=new Set();for(const w of Object.values(cur))for(const g of Object.values(w.groups||{}))for(const a of (g.activities||[]))for(const k of [a.name,...(a.aka||[])])if(/,/.test(k||''))COMMA_NAMES.add(norm(k));
   const thisIdx=actIndex(week);const allIdx={};for(const [d,w] of Object.entries(cur))allIdx[d]=actIndex(w);
   const match=(name,idx)=>{const n=norm(name);if(idx[n])return idx[n];let best=null,bs=-1;
     for(const k of Object.keys(idx)){const r=ratio(n,k);if(r>bs){bs=r;best=k}}if(best!==null&&bs>=0.78)return idx[best];
