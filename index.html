@@ -3603,7 +3603,9 @@ function parseCount(s){const n=[...(s||'').matchAll(/\d+/g)].map(x=>+x[0]).filte
 let COMMA_NAMES=new Set();   // curriculum activity names that have a comma in them, like "Sit, Stand, Squat, Share"
 function splitActs(cell){
   const out=[];let depth=0,cur='';
-  for(const ch of cell){if(ch==='(')depth++;if(ch===')')depth--;
+  const LABEL=/^\s*(belong|believe|become|bible teaching)\s*:/i;   // each form choice starts with its segment
+  for(let k=0;k<cell.length;k++){const ch=cell[k];if(ch==='(')depth++;if(ch===')')depth=Math.max(0,depth-1);
+    if(ch===','&&depth>0&&LABEL.test(cell.slice(k+1)))depth=0;   // a choice missing its ")" ends where the next labeled choice starts
     if(ch===','&&depth===0){if(cur.trim()){out.push(cur.trim());cur='';continue}}cur+=ch}
   if(cur.trim())out.push(cur.trim());
   if(COMMA_NAMES.size)for(let i=0;i<out.length;i++){   // put a name with commas back together: "Sit", "Stand", "Squat", "Share (no supplies)"
